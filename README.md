@@ -134,7 +134,9 @@ flowchart LR
 | 11/2(월) | 리허설 · 코드 프리즈 |
 | **11/3(화)** | 프로젝트 발표회 |
 
-사람별 간트 차트와 날짜별 할 일은 [일정 문서](docs/SCHEDULE.md), 작업은 [Issues](https://github.com/gokimkh123/SW_Design_Development/issues) · [Milestones](https://github.com/gokimkh123/SW_Design_Development/milestones)에서 관리합니다.
+<img src="docs/images/gantt.png" alt="룸메궁합 개발 일정 간트 차트" width="100%"/>
+
+날짜별 · 사람별 할 일은 [일정 문서](docs/SCHEDULE.md)에 있습니다.
 
 ---
 
@@ -156,7 +158,7 @@ flowchart LR
 
 | 역할 | 담당 | 맡는 일 | 폴더 |
 | --- | --- | --- | --- |
-| **1. PM · 기획 · QA** | 건한 | 일정 · 이슈 관리, 설문 문항과 생활 장면 20개, 통합 테스트, 포스터 · 발표회 운영 | `docs/` `data/` |
+| **1. PM · 기획 · QA** | 건한 | 일정 관리, 설문 문항과 생활 장면 20개, 통합 테스트, 포스터 · 발표회 운영 | `docs/` `data/` |
 | **2. 프론트엔드** | 동현 | 모바일 웹 화면(흐름 A~C), 시뮬레이션 실시간 화면 | `frontend/` |
 | **3. 백엔드 · 데이터** | 일준 · 범찬 | API 서버, DB, 후보 추림, 매칭 · 규칙 로직, 시드 데이터, 엔진 연결 | `backend/` |
 | **4. AI 시뮬레이션 엔진** | 건한 | 페르소나 생성, 에이전트 대화 루프, 판정자, 궁합 점수, 규칙 초안 | `engine/` |
