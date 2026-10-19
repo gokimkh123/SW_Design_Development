@@ -1,0 +1,35 @@
+name: 버그
+description: 잘못 동작하는 것을 알립니다
+title: "[버그] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 증상
+      description: 무엇이 어떻게 잘못됐나요?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 방법
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대한 결과
+  - type: input
+    id: env
+    attributes:
+      label: 환경
+      placeholder: 예) 크롬 · 로컬 실행 · SIM_MODE=agents
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 스크린샷 · 로그
