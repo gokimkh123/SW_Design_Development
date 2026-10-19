@@ -1,5 +1,5 @@
 name: 버그
-description: 잘못 동작하는 것을 알립니다
+description: 오작동 사항 등록
 title: "[버그] "
 labels: ["type:bug"]
 body:
@@ -7,7 +7,7 @@ body:
     id: symptom
     attributes:
       label: 증상
-      description: 무엇이 어떻게 잘못됐나요?
+      description: 오작동 내용 및 발생 상황
     validations:
       required: true
   - type: textarea
@@ -23,11 +23,11 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: 기대한 결과
+      label: 기대 결과
   - type: input
     id: env
     attributes:
-      label: 환경
+      label: 실행 환경
       placeholder: 예) 크롬 · 로컬 실행 · SIM_MODE=agents
   - type: textarea
     id: evidence

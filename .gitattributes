@@ -1,4 +1,4 @@
-# Windows · macOS · Linux 팀원이 섞여 있어도 줄바꿈을 LF로 통일한다
+# Windows · macOS · Linux 혼용 환경의 줄바꿈 LF 통일
 * text=auto eol=lf
 
 *.ps1 text eol=crlf

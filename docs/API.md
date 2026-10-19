@@ -3,16 +3,16 @@
 | 항목 | 내용 |
 | --- | --- |
 | 버전 | v1.0 초안 (2026-10-19) |
-| 확정 | 10/26까지 리뷰 → 10/27 개발 시작과 함께 확정 |
+| 확정 | 10/26까지 리뷰 → 10/27 개발 착수 시 확정 |
 | 담당 | 백엔드 일준 · 범찬, 프론트엔드 동현, 엔진 인터페이스 건한 |
 | 변경 규칙 | 이 문서를 먼저 고치는 PR → 동현 + 백엔드 1명 승인 → 구현 |
-| 구현 후 기준 | FastAPI가 만드는 `http://localhost:8000/docs`. 이 문서와 다르면 이 문서를 고친다 |
+| 구현 후 기준 | FastAPI 자동 생성 문서(`http://localhost:8000/docs`). 불일치 시 본 문서 수정 |
 | 함께 보는 문서 | [PRD](PRD.md) · [일정](SCHEDULE.md) · [협업 가이드](../CONTRIBUTING.md) |
 
 ## 목차
 
 1. [공통 규칙](#1-공통-규칙)
-2. [한눈에 보기](#2-한눈에-보기)
+2. [전체 구성](#2-전체-구성)
 3. [데이터 모델](#3-데이터-모델)
 4. [엔드포인트 상세](#4-엔드포인트-상세)
 5. [실시간 이벤트 (SSE)](#5-실시간-이벤트-sse)
@@ -26,11 +26,11 @@
 
 | 항목 | 규칙 |
 | --- | --- |
-| Base URL | 백엔드 `http://localhost:8000/api`. 프론트엔드는 `/api`로 호출하고 Vite 프록시가 백엔드로 넘긴다 |
+| Base URL | 백엔드 `http://localhost:8000/api`. 프론트엔드는 `/api`로 호출, Vite 프록시를 통해 백엔드로 전달 |
 | 형식 | JSON (UTF-8). 필드 이름은 `snake_case` |
 | ID | 문자열. 접두사 + 8자리: `usr_` 사용자, `per_` 페르소나, `sim_` 시뮬레이션, `mat_` 매칭, `rul_` 규칙, `prp_` 수정 제안. 시드 데이터는 읽기 쉬운 ID (`per_haneul`, `per_daeun`) |
 | 시각 | 날짜·시각은 ISO 8601 KST (`2026-11-03T10:15:00+09:00`), 하루 중 시각은 `"HH:MM"` |
-| 사용자 식별 | 로그인 없음. `POST /api/users`로 받은 `user_id`를 이후 요청 헤더 `X-User-Id`에 넣는다 (최종 버전에서 학교 메일 인증으로 교체) |
+| 사용자 식별 | 로그인 없음. `POST /api/users` 응답의 `user_id`를 이후 요청 헤더 `X-User-Id`에 포함 (최종 버전에서 학교 메일 인증으로 교체) |
 | 오류 | `{ "error": { "code": "...", "message": "..." } }` 형식 ([6장](#6-오류-코드)) |
 
 **공통 값**
@@ -45,7 +45,7 @@
 
 ---
 
-## 2. 한눈에 보기
+## 2. 전체 구성
 
 ```mermaid
 sequenceDiagram
@@ -135,11 +135,11 @@ sequenceDiagram
 
 | 필드 | 설명 |
 | --- | --- |
-| `axes` | 5개 축 0~100. 계산 규칙은 [PRD 부록 C](PRD.md#부록-c-계산-규칙-초안). `sleep_rhythm`은 0 = 아침형, 100 = 올빼미 |
-| `axis_labels` | 화면에 그대로 쓰는 이름표 (서버가 계산) |
+| `axes` | 5개 축 0~100, 계산 규칙: [PRD 부록 C](PRD.md#부록-c-계산-규칙-초안). `sleep_rhythm`: 0 = 아침형, 100 = 올빼미 |
+| `axis_labels` | 화면 표시용 이름표 (서버 계산) |
 | `sleep.exam_pattern` | q03 응답: `same` · `earlier` · `later` · `all_nighter` |
 | `preferences.temperature` | q06 응답: `warm` · `moderate` · `cool` · `any` |
-| `must_keep` · `okay_with` | 각 최대 3개, 항목당 30자 이내. 생성 시 LLM이 후보를 제안하고 사용자가 수정 |
+| `must_keep` · `okay_with` | 각 최대 3개, 항목당 30자 이내. 생성 시 LLM 후보 제안 후 사용자 수정 |
 
 ### Candidate
 
@@ -161,8 +161,8 @@ sequenceDiagram
 }
 ```
 
-- 매칭 전에는 이름을 주지 않는다. `alias`는 1차 점수 순서대로 후보 A · B · C.
-- `simulation`은 아직 시작하지 않았으면 `null`.
+- 매칭 전 이름 미제공, `alias`는 1차 점수 순 후보 A · B · C
+- `simulation`: 미시작 시 `null`
 
 ### Simulation
 
@@ -181,7 +181,7 @@ sequenceDiagram
 }
 ```
 
-`mode`의 `live`는 `agents` 또는 `single` 중 서버 설정(`SIM_MODE`)으로 실행한 것을 뜻한다.
+- `mode`의 `live`: 서버 설정(`SIM_MODE`)에 따른 `agents` 또는 `single` 실행
 
 ### SceneResult
 
@@ -210,8 +210,8 @@ sequenceDiagram
 }
 ```
 
-- `speaker`는 `me`(내 AI) 또는 `candidate`(후보 AI). 매칭 전 후보 이름은 `후보 C AI`처럼 별칭으로 표시한다.
-- 발화는 최대 4개. 합의가 일찍 끝나면 더 짧을 수 있다.
+- `speaker`: `me`(내 AI) 또는 `candidate`(후보 AI). 매칭 전 후보 이름은 `후보 C AI` 등 별칭 표시
+- 발화 최대 4개, 조기 합의 시 단축 가능
 
 ### Report
 
@@ -238,9 +238,9 @@ sequenceDiagram
 }
 ```
 
-- `scene_verdicts`는 장면 순서대로 20개. 진행 막대 색에 쓴다.
-- `highlights`는 충돌 → 조율 순, 같은 판정은 장면 순서대로.
-- `expected_conflicts_per_month`는 P1. 산식이 정해지기 전까지 `null`.
+- `scene_verdicts`: 장면 순서 20개, 진행 막대 색상 표시용
+- `highlights`: 충돌 → 조율 순, 동일 판정은 장면 순
+- `expected_conflicts_per_month`: P1, 산식 확정 전까지 `null`
 
 ### Match
 
@@ -262,7 +262,7 @@ sequenceDiagram
 }
 ```
 
-`status`: `pending` · `accepted` · `declined`. 시드 후보는 신청 즉시 `accepted`이고, 이때부터 `partner.name`을 공개한다.
+- `status`: `pending` · `accepted` · `declined`. 시드 후보는 신청 즉시 `accepted`, 이 시점부터 `partner.name` 공개
 
 ### RuleSet
 
@@ -282,18 +282,19 @@ sequenceDiagram
 }
 ```
 
-- 6개 영역마다 규칙 1개. 화면의 출처 표시는 `source`로 만든다 (예: `5일차 충돌`, `2일차 장면`).
-- `status`: `draft` → 양쪽이 동의하면 `confirmed`.
+- 영역별 규칙 1개(총 6개), 화면 출처 표시는 `source` 기반 (예: `5일차 충돌`, `2일차 장면`)
+- `status`: `draft` → 양측 동의 시 `confirmed`
 
 ---
 
 ## 4. 엔드포인트 상세
 
-`X-User-Id` 헤더는 `POST /api/users`, `GET /api/health`, `GET /api/survey`를 뺀 모든 요청에 넣는다.
+- `X-User-Id` 헤더: `POST /api/users`, `GET /api/health`, `GET /api/survey`를 제외한 전 요청에 포함
 
 ### 4.1 GET /api/health
 
-서버와 LLM 설정 확인. 프론트엔드는 처음 세팅할 때 연결 확인용으로 쓴다.
+- 서버 · LLM 설정 확인
+- 프론트엔드 초기 세팅 시 연결 확인용
 
 ```jsonc
 // 200
@@ -310,12 +311,13 @@ sequenceDiagram
 { "user_id": "usr_k3j9x2ab", "nickname": "하늘", "created_at": "2026-11-03T10:11:30+09:00" }
 ```
 
-- `nickname`: 1~10자. 중복 허용.
+- `nickname`: 1~10자, 중복 허용
 - 오류: `422 VALIDATION_ERROR`
 
 ### 4.3 GET /api/survey
 
-설문 12문항. 문항 내용은 `data/seed/survey.json`(PM 관리)에서 읽으므로 프론트엔드는 문구를 하드코딩하지 않는다.
+- 설문 12문항 제공
+- 문항 내용은 `data/seed/survey.json`(PM 관리) 기반, 프론트엔드 문구 하드코딩 금지
 
 ```jsonc
 // 200
@@ -363,7 +365,7 @@ sequenceDiagram
 
 - `section`: `life` 생활 설문(q01~q08) · `situation` 상황 질문(q09~q12)
 - `type`: `time_range` 슬라이더 · `choice` 4지선다
-- 위는 3문항만 보인 예시다. 전체 문항은 [PRD 부록 A](PRD.md#부록-a-설문-12문항-초안).
+- 위 예시는 3문항 발췌, 전체 문항은 [PRD 부록 A](PRD.md#부록-a-설문-12문항-초안) 참고
 
 ### 4.4 POST /api/personas
 
@@ -389,8 +391,8 @@ sequenceDiagram
 // 201 → Persona
 ```
 
-- 각 값은 `GET /api/survey`의 `options[].value`(시간 범위 문항은 `fields[].key`별 시각)를 그대로 보낸다.
-- 응답까지 최대 10초 (LLM이 유형명 · 요약 · 꼭 지켜줘/괜찮아요 후보를 만든다). LLM이 실패하면 서버가 규칙 기반 문구로 대신 채워 **실패 응답을 내지 않는다**.
+- 각 값은 `GET /api/survey`의 `options[].value`(시간 범위 문항은 `fields[].key`별 시각) 그대로 전송
+- 응답 시간 최대 10초 (LLM의 유형명 · 요약 · 꼭 지켜줘/괜찮아요 후보 생성). LLM 실패 시 서버의 규칙 기반 문구 대체, **실패 응답 미반환**
 - 오류: `400 SURVEY_INCOMPLETE` (빠진 문항 ID를 `message`에 표시), `401 USER_REQUIRED`, `422 VALIDATION_ERROR`
 
 ### 4.5 GET /api/personas/{persona_id}
@@ -400,18 +402,18 @@ sequenceDiagram
 ### 4.6 PATCH /api/personas/{persona_id}
 
 ```jsonc
-// 요청 (보낸 필드만 바뀐다)
+// 요청 (전송 필드만 변경)
 { "must_keep": ["24시 이후 통화·게임 소리 X"], "okay_with": ["친구 초대 (미리 말하면)", "공용품 같이 쓰기"] }
 
 // 200 → Persona
 ```
 
-- 이미 끝난 시뮬레이션은 다시 돌리지 않는다. 이후 시작하는 시뮬레이션부터 반영된다.
+- 완료된 시뮬레이션은 재실행하지 않음, 이후 시작 시뮬레이션부터 반영
 - 오류: `404 PERSONA_NOT_FOUND`, `422 VALIDATION_ERROR` (3개 초과, 30자 초과)
 
 ### 4.7 GET /api/personas/{persona_id}/candidates
 
-시드 후보 풀(10명, 나 제외)에서 1차 점수 상위 3명.
+- 시드 후보 풀(10명, 본인 제외) 중 1차 점수 상위 3명 반환
 
 ```jsonc
 // 200
@@ -429,13 +431,13 @@ sequenceDiagram
 // 202 → Simulation (status: queued 또는 running)
 ```
 
-- `mode`: `live`(기본) 또는 `replay`. `replay`인데 사전 생성 파일이 없으면 `live`로 실행하고, 응답의 `mode`에 실제로 실행한 모드를 담는다.
-- 같은 페르소나 · 후보 · 모드로 이미 `running`이거나 `completed`인 시뮬레이션이 있으면 새로 만들지 않고 `200`으로 그것을 돌려준다.
+- `mode`: `live`(기본) 또는 `replay`. `replay` 요청 시 사전 생성 파일이 없으면 `live`로 실행, 응답 `mode`에 실제 실행 모드 표기
+- 동일 페르소나 · 후보 · 모드의 `running` 또는 `completed` 시뮬레이션 존재 시 신규 생성 없이 `200`으로 기존 건 반환
 - 오류: `404 PERSONA_NOT_FOUND`
 
 ### 4.9 GET /api/simulations/{simulation_id}
 
-`200` → Simulation. SSE 연결이 안 될 때 2초 간격 폴링용으로도 쓴다. 오류: `404 SIMULATION_NOT_FOUND`
+`200` → Simulation. SSE 연결 불가 시 2초 간격 폴링용으로도 사용. 오류: `404 SIMULATION_NOT_FOUND`
 
 ### 4.10 GET /api/simulations/{simulation_id}/events
 
@@ -454,7 +456,7 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 // 201 → Match
 ```
 
-- 시드 후보는 즉시 수락(`accepted`)되고, 이 요청 안에서 엔진이 생활 규칙 초안을 만든다 (최대 10초).
+- 시드 후보는 즉시 수락(`accepted`), 동일 요청 내 엔진의 생활 규칙 초안 생성 (최대 10초)
 - 오류: `404 SIMULATION_NOT_FOUND`, `409 SIMULATION_NOT_COMPLETED`
 
 ### 4.13 GET /api/matches/{match_id}
@@ -467,7 +469,8 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 
 ### 4.15 POST /api/matches/{match_id}/rules/agree
 
-요청 본문 없음. 내 동의를 기록하고, 시드 후보는 자동으로 동의한다.
+- 요청 본문 없음
+- 본인 동의 기록, 시드 후보는 자동 동의
 
 ```jsonc
 // 200 → RuleSet
@@ -529,7 +532,7 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 }
 ```
 
-메모 원문은 저장하지 않고 상대에게 보내지 않는다.
+- 메모 원문 미저장 · 상대 미전달
 
 ---
 
@@ -539,7 +542,7 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 
 ### 5.1 이벤트 종류
 
-| `event` | 언제 | `data` |
+| `event` | 발생 시점 | `data` |
 | --- | --- | --- |
 | `simulation_started` | 연결 직후 1회 | `{ simulation_id, mode, total_scenes, me: { name, type_name }, candidate: { alias, type_name } }` |
 | `scene_started` | 장면 시작 | `{ scene_index, scene: { scene_id, day, weekday, time, category, title, situation } }` |
@@ -566,11 +569,11 @@ data: {"scene_index":9,"verdict":"negotiated","reason":"소음 기준 차이가 
 
 ### 5.3 규칙
 
-- 이벤트 `id`는 `{scene_index}-{순번}`. 시작 이벤트는 `0-0`.
-- 서버는 모든 이벤트를 DB에 저장한다. 연결이 끊겼다가 다시 붙으면 브라우저가 보내는 `Last-Event-ID` 다음부터 다시 보내고, 헤더가 없으면 처음부터 보낸다. 이미 끝난 시뮬레이션에 연결해도 전체 이벤트를 받은 뒤 `simulation_completed`로 끝난다.
-- 15초마다 `: ping` 주석을 보내 연결을 유지한다.
-- `replay` 모드는 같은 이벤트를 `REPLAY_DELAY_MS` 간격으로 보낸다.
-- 장면 판정이 실패하면 `scene_judged`의 `verdict`가 `pending`으로 오고 다음 장면으로 넘어간다.
+- 이벤트 `id`: `{scene_index}-{순번}`, 시작 이벤트는 `0-0`
+- 서버의 전 이벤트 DB 저장. 재연결 시 브라우저가 보내는 `Last-Event-ID` 이후부터 재전송, 헤더 부재 시 처음부터 전송. 완료된 시뮬레이션 연결 시에도 전체 이벤트 수신 후 `simulation_completed`로 종료
+- 15초 간격 `: ping` 주석 전송으로 연결 유지
+- `replay` 모드: 동일 이벤트를 `REPLAY_DELAY_MS` 간격으로 전송
+- 장면 판정 실패 시 `scene_judged`의 `verdict`는 `pending`, 다음 장면으로 진행
 
 ### 5.4 프론트엔드 사용 예
 
@@ -586,7 +589,7 @@ es.addEventListener("simulation_completed", (e) => {
 });
 ```
 
-같은 `id`의 이벤트가 두 번 올 수 있으니(재연결) 화면에 넣기 전에 `id`로 중복을 거른다.
+- 재연결 시 동일 `id` 이벤트 중복 수신 가능 → 화면 반영 전 `id` 기준 중복 제거
 
 ---
 
@@ -598,20 +601,21 @@ es.addEventListener("simulation_completed", (e) => {
 
 | HTTP | `code` | 의미 |
 | --- | --- | --- |
-| 400 | `SURVEY_INCOMPLETE` | 12문항 중 빠진 응답이 있음 |
-| 401 | `USER_REQUIRED` | `X-User-Id`가 없거나 없는 사용자 |
+| 400 | `SURVEY_INCOMPLETE` | 12문항 중 응답 누락 |
+| 401 | `USER_REQUIRED` | `X-User-Id` 누락 또는 미등록 사용자 |
 | 404 | `USER_NOT_FOUND` · `PERSONA_NOT_FOUND` · `SIMULATION_NOT_FOUND` · `MATCH_NOT_FOUND` · `RULE_NOT_FOUND` | 대상 없음 |
-| 409 | `SIMULATION_NOT_COMPLETED` | 시뮬레이션이 끝나기 전에 리포트 · 매칭 요청 |
-| 422 | `VALIDATION_ERROR` | 형식 오류 (FastAPI 기본 422 응답을 이 형식으로 감싼다) |
-| 429 | `LLM_RATE_LIMITED` | LLM 분당 한도 초과. 잠시 후 재시도 |
-| 503 | `LLM_UNAVAILABLE` | LLM 호출 실패. 부스에서는 리플레이 모드로 전환 |
-| 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류 |
+| 409 | `SIMULATION_NOT_COMPLETED` | 시뮬레이션 완료 전 리포트 · 매칭 요청 |
+| 422 | `VALIDATION_ERROR` | 형식 오류 (FastAPI 기본 422 응답을 본 형식으로 변환) |
+| 429 | `LLM_RATE_LIMITED` | LLM 분당 한도 초과, 잠시 후 재시도 |
+| 503 | `LLM_UNAVAILABLE` | LLM 호출 실패, 부스에서는 리플레이 모드 전환 |
+| 500 | `INTERNAL_ERROR` | 기타 서버 오류 |
 
 ---
 
 ## 7. 엔진 인터페이스
 
-백엔드(일준 · 범찬)와 엔진(건한) 사이의 약속이다. 백엔드는 `engine` 패키지에서 아래 함수만 가져다 쓴다.
+- 백엔드(일준 · 범찬)와 엔진(건한) 간 인터페이스 약속
+- 백엔드는 `engine` 패키지의 아래 함수만 호출
 
 ```python
 # engine/__init__.py
@@ -625,7 +629,7 @@ def load_scenes() -> list[SceneTemplate]:
     """data/seed/scenes.json의 장면 20개"""
 
 async def simulate(me: Persona, candidate: Persona, *, mode: str = "agents") -> AsyncIterator[SimEvent]:
-    """장면 20개를 순서대로 실행하며 이벤트를 하나씩 내보낸다 (mode: agents | single)"""
+    """장면 20개 순차 실행 및 이벤트 단위 반환 (mode: agents | single)"""
 
 def score(judgements: list[SceneJudgement]) -> int:
     """궁합 점수 (PRD 8.5)"""
@@ -643,11 +647,11 @@ async def rephrase(memo: str, sender: Persona, receiver: Persona) -> Rephrased: 
 
 | 약속 | 내용 |
 | --- | --- |
-| 모델 | `engine/models.py`의 Pydantic 모델. 필드 이름은 이 문서 3장과 같다 (ID 필드는 백엔드가 붙인다) |
-| 이벤트 | `SimEvent`는 `{ "type": "utterance", "data": {...} }` 모양으로 5장의 SSE 이벤트와 같다. 백엔드는 받은 이벤트를 저장하고 그대로 SSE로 내보낸다 |
-| 의존성 | 엔진은 FastAPI · DB를 모른다. 순수 Python + Anthropic SDK |
-| 가짜 엔진 | `engine/fake.py`는 같은 함수 이름으로 `data/replays/`의 결과를 돌려준다. 엔진 완성 전 백엔드 개발과 `replay` 모드에 같이 쓴다 |
-| 단독 실행 | `python -m engine.cli simulate --me per_haneul --candidate per_daeun`로 터미널에서 결과를 확인할 수 있게 한다 |
+| 모델 | `engine/models.py`의 Pydantic 모델. 필드 이름은 본 문서 3장과 동일 (ID 필드는 백엔드 부여) |
+| 이벤트 | `SimEvent` 형식은 `{ "type": "utterance", "data": {...} }`로 5장 SSE 이벤트와 동일. 백엔드는 수신 이벤트 저장 후 SSE로 그대로 전달 |
+| 의존성 | 엔진의 FastAPI · DB 비의존. 순수 Python + Anthropic SDK |
+| 가짜 엔진 | `engine/fake.py`: 동일 함수명으로 `data/replays/` 결과 반환. 엔진 완성 전 백엔드 개발 및 `replay` 모드 공용 |
+| 단독 실행 | `python -m engine.cli simulate --me per_haneul --candidate per_daeun`로 터미널 내 결과 확인 지원 |
 
 ---
 
@@ -667,20 +671,20 @@ export default defineConfig({
 });
 ```
 
-프록시를 쓰면 브라우저 입장에서 같은 주소라 CORS 설정이 필요 없다.
+- 프록시 사용 시 브라우저 기준 동일 출처로 CORS 설정 불필요
 
-### 8.2 mock으로 먼저 개발하기
+### 8.2 mock 기반 선행 개발
 
-- 프론트엔드는 이 문서의 JSON 예시로 mock 응답을 만들어 화면을 먼저 개발한다 (`VITE_USE_MOCK=true`).
-- 백엔드는 엔진 완성 전까지 가짜 엔진을 쓴다.
-- 10/28(M1)까지 화면 → API → 가짜 엔진 → DB를 한 줄로 연결해 통합 문제를 일찍 찾는다.
+- 프론트엔드: 본 문서 JSON 예시 기반 mock 응답으로 화면 선행 개발 (`VITE_USE_MOCK=true`)
+- 백엔드: 엔진 완성 전까지 가짜 엔진 사용
+- 10/28(M1)까지 화면 → API → 가짜 엔진 → DB 한 줄 연결로 통합 문제 조기 발견
 
 ### 8.3 환경변수 (`backend/.env`)
 
 | 이름 | 예시 | 설명 |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | (비공개) | 건한에게 받는다. 커밋 금지 |
-| `LLM_PROVIDER` | `anthropic` | 다른 API로 바꿀 때 |
+| `ANTHROPIC_API_KEY` | (비공개) | 건한으로부터 비공개 수령, 커밋 금지 |
+| `LLM_PROVIDER` | `anthropic` | 타 API 전환 시 변경 |
 | `LLM_MODEL` | `claude-haiku-5-5` | |
 | `LLM_MAX_CONCURRENCY` | `8` | 동시 LLM 요청 수 상한 |
 | `SIM_MODE` | `agents` | `agents` · `single` · `replay` |

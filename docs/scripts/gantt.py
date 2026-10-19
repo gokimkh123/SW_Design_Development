@@ -1,6 +1,6 @@
-"""룸메궁합 일정 간트 차트 PNG를 만든다.
+"""룸메궁합 일정 간트 차트 PNG 생성.
 
-일정이 바뀌면 아래 GROUPS · MILESTONES를 고치고 다시 실행한다 (matplotlib, 맑은 고딕 필요).
+일정 변경 시 아래 GROUPS · MILESTONES 수정 후 재실행 (matplotlib, 맑은 고딕 필요).
 usage: python docs/scripts/gantt.py docs/images/gantt.png
 """
 import sys
