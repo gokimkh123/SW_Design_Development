@@ -45,12 +45,13 @@ gitGraph
 ## 커밋 메시지
 
 ```text
-<종류>(<영역>): <작업 내용>
+<종류>[(<영역>)]: <한국어 설명>
 ```
 
 - 종류: `feat` 기능 · `fix` 버그 · `docs` 문서 · `refactor` 구조 개선 · `test` 테스트 · `chore` 설정·데이터
-- 영역: `frontend` · `backend` · `engine` · `data` · `docs`
-- 예: `feat(frontend): 페르소나 카드 화면 추가`, `fix(backend): 리포트 점수 null 처리`
+- 영역은 선택 사항: `frontend` · `backend` · `engine` · `data` · `docs`
+- **콜론 뒤 설명은 한국어로 작성한다.** `feat`·`docs` 같은 종류와 선택적 영역만 영문으로 쓴다.
+- 예: `docs: 문서 수정`, `feat(frontend): 페르소나 카드 화면 추가`, `fix(backend): 리포트 점수 null 처리`
 
 ## 리뷰 짝
 
