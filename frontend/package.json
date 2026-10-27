@@ -1,0 +1,25 @@
+{
+  "name": "roommate-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "esbuild tests/logic.test.ts --bundle --platform=node --format=esm --outfile=.test-dist/logic.test.mjs && node --test .test-dist/logic.test.mjs"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0"
+  }
+}
