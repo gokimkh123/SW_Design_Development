@@ -45,12 +45,13 @@ gitGraph
 ## 커밋 메시지
 
 ```text
-<종류>(<영역>): <작업 내용>
+<종류>[(<영역>)]: <한국어 설명>
 ```
 
 - 종류: `feat` 기능 · `fix` 버그 · `docs` 문서 · `refactor` 구조 개선 · `test` 테스트 · `chore` 설정·데이터
-- 영역: `frontend` · `backend` · `engine` · `data` · `docs`
-- 예: `feat(frontend): 페르소나 카드 화면 추가`, `fix(backend): 리포트 점수 null 처리`
+- 영역은 선택 사항: `frontend` · `backend` · `engine` · `data` · `docs`
+- **콜론 뒤 설명은 한국어로 작성한다.** `feat`·`docs` 같은 종류와 선택적 영역만 영문으로 쓴다.
+- 예: `docs: 문서 수정`, `feat(frontend): 페르소나 카드 화면 추가`, `fix(backend): 리포트 점수 null 처리`
 
 ## 리뷰 짝
 
@@ -69,6 +70,12 @@ gitGraph
 1. `docs/API.md` 수정 PR 선행 (`docs/` 브랜치)
 2. 동현 및 백엔드 1명 승인
 3. 코드 변경 진행
+
+## 문서 문체
+
+- 브랜치 작업 중에는 자유롭게 작성
+- `main` 병합 전 문어체(`~한다`) 또는 개조식(명사형 종결)으로 정리, 구어체(`~해요` · `~합니다`) 금지
+- 예외: 앱 화면 노출 문구(설문 문항, 한 줄 판정 등)
 
 ## 버그 처리
 
