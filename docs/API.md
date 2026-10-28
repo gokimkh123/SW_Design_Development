@@ -80,7 +80,7 @@ sequenceDiagram
 | 4 | POST | `/api/personas` | 응답 → 페르소나 생성 | P0 | 일준 | A4 |
 | 5 | GET | `/api/personas/{persona_id}` | 페르소나 조회 | P0 | 일준 | A4 |
 | 6 | PATCH | `/api/personas/{persona_id}` | 꼭 지켜줘 · 괜찮아요 수정 | P0 | 일준 | A4 |
-| 7 | GET | `/api/personas/{persona_id}/candidates` | 후보 3명 | P0 | 범찬 | B1 |
+| 7 | GET | `/api/personas/{persona_id}/candidates` | 후보 3명 | P0 | 일준 | B1 |
 | 8 | POST | `/api/simulations` | 시뮬레이션 시작 | P0 | 일준 | B1 · B2 |
 | 9 | GET | `/api/simulations/{simulation_id}` | 상태 · 진행률 | P0 | 일준 | B1 · B2 |
 | 10 | GET | `/api/simulations/{simulation_id}/events` | 실시간 이벤트 (SSE) | P0 | 일준 | B2 |
@@ -676,7 +676,8 @@ export default defineConfig({
 ### 8.2 mock 기반 선행 개발
 
 - 프론트엔드: 본 문서 JSON 예시 기반 mock 응답으로 화면 선행 개발 (`VITE_USE_MOCK=true`)
-- 백엔드: 엔진 완성 전까지 가짜 엔진 사용
+- 백엔드: 엔진 완성 전까지 가짜 엔진 사용. `engine/fake.py` 도착 전에는 백엔드 임시 가짜 엔진(`backend/app/fake_engine.py`, LLM 미호출) 사용
+- 백엔드의 엔진 호출은 엔진 어댑터(`backend/app/engine_adapter.py`) 단일 경유
 - 10/28(M1)까지 화면 → API → 가짜 엔진 → DB 한 줄 연결로 통합 문제 조기 발견
 
 ### 8.3 환경변수 (`backend/.env`)
@@ -687,6 +688,7 @@ export default defineConfig({
 | `LLM_PROVIDER` | `anthropic` | 타 API 전환 시 변경 |
 | `LLM_MODEL` | `claude-haiku-5-5` | |
 | `LLM_MAX_CONCURRENCY` | `8` | 동시 LLM 요청 수 상한 |
+| `ENGINE_IMPL` | `fake` | `fake` 백엔드 임시 가짜 엔진(LLM 미호출, 기본값) · `real` `engine` 패키지 |
 | `SIM_MODE` | `agents` | `agents` · `single` · `replay` |
 | `REPLAY_DELAY_MS` | `600` | 리플레이 발화 간격 |
 | `DATABASE_URL` | `sqlite:///./roommate.db` | |
