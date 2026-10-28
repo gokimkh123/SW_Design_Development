@@ -140,7 +140,7 @@ export interface RuleSet {
   agreements: { me: boolean; partner: boolean };
 }
 
-/** P1 response shapes from docs/API.md 4.16. P2 has no API contract yet. */
+/** P1 response shapes from docs/common/API.md 4.16. P2 has no API contract yet. */
 export interface Comparison {
   me: { axes: Axes };
   candidates: Array<{

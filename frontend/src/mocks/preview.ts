@@ -1,5 +1,5 @@
 /**
- * P2 visual-only fixtures. No D1/D3/D4 HTTP contract exists in docs/API.md yet.
+ * P2 visual-only fixtures. No D1/D3/D4 HTTP contract exists in docs/common/API.md yet.
  * These values must never be presented as live room or administrator data.
  */
 export interface PreviewRoom {
