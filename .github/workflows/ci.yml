@@ -59,7 +59,10 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements*.txt
-      - run: pip install -r requirements-dev.txt
+      - name: 의존성 설치 (서버 의존성 requirements.txt 존재 시 함께 설치)
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements-dev.txt
       - run: python -m pytest -q
 
   docker:

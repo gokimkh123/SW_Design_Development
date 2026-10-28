@@ -19,6 +19,8 @@ env:
 jobs:
   build:
     name: build · push images
+    # 수동 실행(workflow_dispatch)도 main에서만 허용 → 다른 브랜치 코드로 latest 이미지 덮어쓰기 방지
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -123,10 +125,11 @@ jobs:
           $SSH 'bash -s' <<EOF
           set -euo pipefail
           cd ~/roommate
+          # 실패 시에도 레지스트리 로그인 정보 삭제
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
           docker compose pull $SERVICES
           docker compose up -d --remove-orphans $SERVICES
-          docker logout ghcr.io
           docker image prune -f
           docker compose ps
           EOF
