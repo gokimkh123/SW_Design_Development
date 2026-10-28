@@ -18,7 +18,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
         run: |
           if [ "$HEAD_REF" != "develop" ]; then
-            echo "::error::main으로의 PR은 develop 브랜치에서만 허용 (현재: $HEAD_REF). frontend · backend는 develop으로 PR 생성"
+            echo "::error::main으로의 PR은 develop 브랜치에서만 허용 (현재: $HEAD_REF). frontend · backend는 push 시 develop 자동 병합"
             exit 1
           fi
           echo "출발 브랜치 develop 확인"

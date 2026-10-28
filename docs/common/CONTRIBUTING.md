@@ -37,13 +37,22 @@ flowchart LR
 2. **최신화** — 작업 전 담당 브랜치에서 `git pull` 후 `git pull origin develop`으로 다른 영역 변경 반영
 3. **커밋 · push** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋 후 담당 브랜치(`frontend` · `backend`)에 push
 4. **CI 확인** — 저장소 **Actions** 탭에서 결과 확인. 통과 시 `develop` 자동 병합, 실패 시 같은 브랜치에 수정 커밋 push
-5. **충돌 처리** — 자동 병합 실패(`auto merge to develop` 빨간 표시) 시 `git pull origin develop` → 충돌 해결 → push
+5. **자동 병합 실패 처리** — `auto merge to develop` 빨간 표시 시 로그 확인
+   - 충돌: `git pull origin develop` → 충돌 해결 → push
+   - 보호 경로 변경: 아래 보호 경로 규칙에 따라 PR로 반영
 6. **`main` 반영 · 배포** — 건한이 `develop` CI 통과 확인 후 `develop` → `main` PR 병합 → CD 자동 실행
-7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드는 자동 병합되지 않음, 발표회 버전은 `main`에서 실행
+7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드는 자동 병합되지 않음. 자동 병합 후 `develop` CI 실패 시 원인 브랜치 담당자가 수정 push, 발표회 버전은 `main`에서 실행
 
-- `frontend` · `backend` 브랜치는 삭제하지 않음
+- `frontend` · `backend` 브랜치는 삭제하지 않음, 팀원은 `develop` · `main`에 직접 push 금지
 - 문서 · 엔진 · 데이터(건한): 단기 브랜치(`docs/…` 등) → `develop` PR 병합
-- 코드 리뷰: 자동 병합 체계로 PR 승인 절차 생략, 리뷰 짝은 `develop` 반영 내용을 확인하고 문제 시 담당자에게 공유
+- 코드 리뷰: 자동 병합 체계로 PR 승인 절차 생략. 리뷰 짝은 `develop` 반영 후 내용을 확인하고 문제 시 담당자에게 공유
+
+### 보호 경로 규칙
+
+- 대상: `.github/` · `.githooks/` · `scripts/` · `deploy/` · `docs/common/` · `.gitignore` · `.gitattributes` · `.dockerignore` · `Dockerfile`
+- 위 경로 변경이 포함된 push는 CI 통과 후에도 자동 병합 중단 (CI/CD · 보안 설정 및 공통 문서 무단 변경 방지)
+- 반영 방법: 해당 변경만 단기 브랜치(`chore/…` · `docs/…`)로 분리 → `develop` 대상 PR 생성 → 건한 승인 후 **Create a merge commit**
+- `frontend` · `backend` 브랜치에 이미 보호 경로 변경을 커밋한 경우: 해당 브랜치 → `develop` PR 생성, 건한 승인 · 병합 전까지 자동 병합 중단 상태 유지
 
 ## CI/CD
 
@@ -67,7 +76,8 @@ flowchart LR
 | `docs/` | 문서 | `docs/api-review` |
 | `chore/` | 설정 · 빌드 · 데이터 | `chore/seed-personas` |
 
-- 장기 브랜치 `frontend` · `backend` 외 단기 브랜치에만 적용
+- 장기 브랜치 `frontend` · `backend` 외 단기 브랜치(건한의 문서 · 엔진 · 데이터 작업, 보호 경로 변경 PR)에만 적용
+- 팀원의 일반 기능 · 버그 수정은 단기 브랜치 없이 담당 브랜치(`frontend` · `backend`)에 직접 커밋
 
 ## 커밋 메시지
 
@@ -82,20 +92,20 @@ flowchart LR
 
 ## 리뷰 짝
 
-| PR 영역 | 리뷰어 | 사유 |
-| --- | --- | --- |
-| `frontend/` | 범찬 | 흐름 C 화면 공동 담당, API 연동 확인 |
-| `backend/` | 일준 ↔ 범찬 상호 | 동일 서버 코드 |
-| `engine/` | 범찬 | 엔진 연결 담당 |
-| `docs/common/API.md` | 동현 + 백엔드 1명 | 프론트 · 백엔드 간 약속 변경 PR |
-| `docs/` `data/` | 건한 | PM |
+| 영역 | 리뷰어 | 리뷰 시점 | 사유 |
+| --- | --- | --- | --- |
+| `frontend/` | 범찬 | `develop` 자동 병합 후 | 흐름 C 화면 공동 담당, API 연동 확인 |
+| `backend/` | 일준 ↔ 범찬 상호 | `develop` 자동 병합 후 | 동일 서버 코드 |
+| `engine/` | 범찬 | PR 병합 전 | 엔진 연결 담당 |
+| `docs/common/API.md` | 동현 + 백엔드 1명 | PR 병합 전 | 프론트 · 백엔드 간 약속 변경 |
+| 보호 경로 · `docs/common/` | 건한 | PR 병합 전 | PM · CI/CD · 보안 설정 |
 
-- 리뷰는 요청 당일 내 처리 (6일 개발 기간 고려, PR 1일 이상 정체 방지)
+- 리뷰 · PR 승인은 요청 당일 내 처리 (6일 개발 기간 고려, 1일 이상 정체 방지)
 
 ## API 변경 절차
 
-1. `docs/common/API.md` 수정 PR 선행 (`docs/` 브랜치)
-2. 동현 및 백엔드 1명 승인
+1. `docs/common/API.md` 수정을 단기 브랜치(`docs/…`)로 분리하여 `develop` 대상 PR 생성 (보호 경로이므로 `frontend` · `backend` push로는 자동 병합 불가)
+2. 동현 및 백엔드 1명 승인 후 건한이 병합
 3. 코드 변경 진행
 
 ## 문서 문체
@@ -106,7 +116,7 @@ flowchart LR
 
 ## 버그 처리
 
-- 즉시 수정 가능 시 `fix/` 브랜치로 수정
+- 즉시 수정 가능 시 담당 브랜치(`frontend` · `backend`)에 수정 커밋 push
 - 담당자 확인 필요 시 GitHub 이슈 버그 템플릿 등록 또는 단톡방에 재현 방법과 함께 공유
 
 ## 소통
@@ -126,9 +136,10 @@ flowchart LR
 | `.gitignore` | `git add` | `.env` · 키 · 인증서 파일 추적 제외 |
 | pre-commit hook ([`.githooks/pre-commit`](../../.githooks/pre-commit)) | 커밋 | `.env` 파일 · API 키 · 토큰 · 개인키 문자열 포함 시 커밋 거부 |
 | GitHub Push protection | push | 알려진 형식의 키가 포함된 push 거부 |
-| CI `secret scan` ([`scripts/check-secrets.sh`](../../scripts/check-secrets.sh)) | PR | 검사 실패 시 `develop` · `main` 병합 불가 |
-| Environment `production` | 배포 | VM 접속 정보는 `main` 배포 job에서만 접근 가능 |
-| CODEOWNERS | 리뷰 | `.github/` · `scripts/` · `deploy/` · `.gitignore` · Dockerfile 변경은 건한 승인 필수 |
+| CI `secret scan` ([`scripts/check-secrets.sh`](../../scripts/check-secrets.sh)) | push · PR | 검사 실패 시 `develop` 자동 병합 중단, `main` 대상 PR 실패 표시 |
+| 보호 경로 규칙 ([`auto-merge.yml`](../../.github/workflows/auto-merge.yml)) | 자동 병합 | CI/CD · 보안 · 배포 설정 변경은 자동 병합 중단 → PR로 건한 승인 |
+| Environment `production` | 배포 | VM 접속 정보는 `main` 배포 job에서만 접근 가능 (배포 브랜치 `main` 한정) |
+| CODEOWNERS | PR | 보호 경로 · API 명세 PR 생성 시 담당 리뷰어 자동 지정 |
 
 - pre-commit hook 활성화(최초 1회, 저장소 루트): `git config core.hooksPath .githooks` (`frontend/`에서 `npm install` 시 자동 설정)
 - 검사 우회(`--no-verify` 등) 금지. 오탐 시 건한에게 문의
