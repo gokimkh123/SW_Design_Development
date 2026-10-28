@@ -33,7 +33,7 @@ gitGraph
 | --- | --- | --- | --- |
 | 작업 브랜치 (`feat/` 등) | 개인 작업 | → `develop` **Squash and merge** | push마다 CI |
 | `develop` | 통합 · 검증 (기본 작업 기준) | → `main` **Create a merge commit** | CI |
-| `main` | 배포 · 발표회 버전 | — | CD (GitHub Pages 배포) |
+| `main` | 배포 · 발표회 버전 | — | CD (Docker 이미지 → VM 배포) |
 
 1. **할 일 확인** — [일정 문서](docs/SCHEDULE.md)의 날짜별 할 일 표 내 당일 담당 칸 확인
 2. **브랜치** — 최신 `develop`에서 `종류/짧은-설명` 형식으로 분기 (예: `feat/persona-card`)
@@ -47,14 +47,14 @@ gitGraph
 
 | 워크플로 | 실행 시점 | 내용 |
 | --- | --- | --- |
-| [CI](.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) |
+| [CI](.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) / Docker 이미지 빌드 검증 |
 | [main guard](.github/workflows/main-guard.yml) | `main` 대상 PR | 출발 브랜치가 `develop`이 아니면 실패 |
-| [CD](.github/workflows/cd.yml) | `main` push | 프론트엔드 목업 빌드(`VITE_USE_MOCK=true`) → GitHub Pages 배포 |
+| [CD](.github/workflows/cd.yml) | `main` push | Docker 이미지 빌드 → GHCR 업로드 → VM에서 `docker compose` 재기동 ([VM 배포 안내](deploy/README.md)) |
 
 - CI 결과: PR 하단 Checks 또는 저장소 **Actions** 탭에서 확인, 실패 시 로그 확인 후 같은 브랜치에 수정 커밋 push
 - push 전 로컬 확인 권장: `frontend/`에서 `npm run typecheck && npm test`, `backend/`에서 `python -m pytest`
-- API 키 미사용: CI는 가짜 엔진(`ENGINE_IMPL=fake`), CD는 목업 모드로만 실행
-- 백엔드 배포: 서버 미확정으로 보류, 발표회 시연은 로컬 실행([로컬 실행 안내](docs/LOCAL_DEVELOPMENT.md))
+- API 키: CI는 가짜 엔진(`ENGINE_IMPL=fake`)으로 키 미사용, 배포 키는 VM의 `~/roommate/.env`에만 보관
+- 백엔드 배포 조건: `backend/app/main.py`(FastAPI `app`) 및 `backend/requirements.txt` 존재 시 자동 포함, 그 전에는 프론트엔드 목업 모드만 배포
 
 ## 브랜치 이름
 

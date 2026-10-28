@@ -173,7 +173,7 @@ flowchart LR
 | 프론트엔드 | React · TypeScript · Vite · Tailwind CSS |
 | 백엔드 | Python · FastAPI · SQLite · SSE |
 | AI 엔진 | Claude API (Haiku 5.5), 모델 교체 가능 구조 |
-| CI/CD | GitHub Actions, GitHub Pages (목업 데모: <https://gokimkh123.github.io/SW_Design_Development/>) |
+| CI/CD | GitHub Actions, Docker (GHCR) → VM 배포 ([배포 안내](deploy/README.md)) |
 
 ---
 
