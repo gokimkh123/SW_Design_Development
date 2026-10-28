@@ -572,11 +572,10 @@ SW_Design_Development/
 ├── .githooks/          # pre-commit (비밀 정보 커밋 차단)
 ├── scripts/            # check-secrets.sh
 ├── deploy/             # VM 배포 docker-compose
-├── docs/               # 전체 문서 (PRD, API, 일정, 협업 가이드, 배포, 이미지)
-│   ├── frontend/       #   프론트엔드 실행 안내 · 구현 계획
-│   ├── backend/        #   백엔드 안내 · 프론트엔드 인수인계
-│   ├── engine/         #   엔진 설계
-│   └── data/           #   시드 데이터 형식
+├── docs/
+│   ├── frontend/       #   프론트엔드 문서 (실행 안내 · 구현 계획)
+│   ├── backend/        #   백엔드 문서 (안내 · 프론트엔드 인수인계)
+│   └── common/         #   공통 문서 (PRD · API · 일정 · 협업 · 배포 · 엔진 · 데이터 · 이미지)
 ├── frontend/           # React 모바일 웹 (동현)
 ├── backend/            # FastAPI 서버 (일준 · 범찬)
 │   ├── app/            #   엔진 어댑터 · 임시 가짜 엔진 (서버 코드 예정)

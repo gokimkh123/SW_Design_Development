@@ -15,52 +15,45 @@
 ## 작업 흐름
 
 ```mermaid
-gitGraph
-    commit id: "main"
-    branch develop
-    checkout develop
-    branch frontend
-    checkout frontend
-    commit id: "화면 구현"
-    checkout develop
-    branch backend
-    checkout backend
-    commit id: "API 구현"
-    checkout develop
-    merge frontend id: "PR (CI)"
-    merge backend id: "PR (CI) "
-    checkout main
-    merge develop id: "PR (CD)"
+flowchart LR
+    F[frontend push<br/>동현] --> CI1[CI]
+    B[backend push<br/>일준 · 범찬] --> CI2[CI]
+    CI1 -->|통과 시 자동 병합| D[develop]
+    CI2 -->|통과 시 자동 병합| D
+    D --> CI3[develop CI]
+    CI3 -->|건한 PR 승인| M[main]
+    M --> CD[CD: Docker 이미지<br/>GHCR 패키지]
+    CD --> VM[VM 배포]
 ```
 
-| 브랜치 | 담당 | 역할 | 병합 대상 · 방식 | 자동화 |
+| 브랜치 | 담당 | 역할 | 다음 단계 | 자동화 |
 | --- | --- | --- | --- | --- |
-| `frontend` | 동현 | 프론트엔드 작업 (장기 유지) | → `develop` **Create a merge commit** | push마다 CI |
-| `backend` | 일준 · 범찬 | 백엔드 작업 (장기 유지) | → `develop` **Create a merge commit** | push마다 CI |
-| `develop` | 건한 | 통합 · 검증 | → `main` **Create a merge commit** | CI |
+| `frontend` | 동현 | 프론트엔드 작업 | CI 통과 시 `develop` **자동 병합** | push마다 CI |
+| `backend` | 일준 · 범찬 | 백엔드 작업 | CI 통과 시 `develop` **자동 병합** | push마다 CI |
+| `develop` | 건한 | 통합 · 검증 | 건한이 `develop` → `main` PR 병합 | 자동 병합 직후 CI |
 | `main` | 건한 | 배포 · 발표회 버전 | — | CD (Docker 이미지 → VM 배포) |
-
-- `frontend` · `backend`는 병합 후에도 삭제하지 않음 (Squash 병합 금지: 장기 브랜치 이력 충돌 방지)
-- 문서 · 엔진 · 데이터(건한): 단기 브랜치(`docs/…` 등) → `develop` Squash 병합 후 브랜치 삭제
-- 담당 브랜치 내 단기 브랜치(`feat/…`) 사용은 선택 사항: 분기 · 병합 대상은 `frontend` 또는 `backend`
 
 1. **할 일 확인** — [일정 문서](SCHEDULE.md)의 날짜별 할 일 표 내 당일 담당 칸 확인
 2. **최신화** — 작업 전 담당 브랜치에서 `git pull` 후 `git pull origin develop`으로 다른 영역 변경 반영
-3. **커밋 · push** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋 · push (push마다 CI 실행)
-4. **PR** — 기능 단위 완료 시 `frontend` 또는 `backend` → **`develop`** PR 생성, PR 템플릿에 작업 내용 및 확인 방법 기재
-5. **리뷰** — CI 통과 및 리뷰 짝 1명 승인 후 **Create a merge commit** (브랜치 삭제 금지)
-6. **`main` 반영** — 건한이 `develop` → `main` PR 생성 후 병합 (`frontend` · `backend` → `main` 직접 PR 금지)
-7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드 병합 금지, 발표회 버전은 `main`에서 실행
+3. **커밋 · push** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋 후 담당 브랜치(`frontend` · `backend`)에 push
+4. **CI 확인** — 저장소 **Actions** 탭에서 결과 확인. 통과 시 `develop` 자동 병합, 실패 시 같은 브랜치에 수정 커밋 push
+5. **충돌 처리** — 자동 병합 실패(`auto merge to develop` 빨간 표시) 시 `git pull origin develop` → 충돌 해결 → push
+6. **`main` 반영 · 배포** — 건한이 `develop` CI 통과 확인 후 `develop` → `main` PR 병합 → CD 자동 실행
+7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드는 자동 병합되지 않음, 발표회 버전은 `main`에서 실행
+
+- `frontend` · `backend` 브랜치는 삭제하지 않음
+- 문서 · 엔진 · 데이터(건한): 단기 브랜치(`docs/…` 등) → `develop` PR 병합
+- 코드 리뷰: 자동 병합 체계로 PR 승인 절차 생략, 리뷰 짝은 `develop` 반영 내용을 확인하고 문제 시 담당자에게 공유
 
 ## CI/CD
 
 | 워크플로 | 실행 시점 | 내용 |
 | --- | --- | --- |
-| [CI](../.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) / Docker 이미지 빌드 검증 |
-| [main guard](../.github/workflows/main-guard.yml) | `main` 대상 PR | 출발 브랜치가 `develop`이 아니면 실패 |
-| [CD](../.github/workflows/cd.yml) | `main` push | Docker 이미지 빌드 → GHCR 업로드 → VM에서 `docker compose` 재기동 ([VM 배포 안내](DEPLOY.md)) |
+| [CI](../../.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 비밀 정보 검사 / 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) / Docker 이미지 빌드 검증 |
+| [auto merge to develop](../../.github/workflows/auto-merge.yml) | `frontend` · `backend`의 CI 통과 | 해당 커밋을 `develop`에 병합 → `develop` CI 실행 |
+| [main guard](../../.github/workflows/main-guard.yml) | `main` 대상 PR | 출발 브랜치가 `develop`이 아니면 실패, 비밀 정보 검사 |
+| [CD](../../.github/workflows/cd.yml) | `main` push | Docker 이미지 빌드 → GHCR 패키지 업로드 → VM에서 `docker compose` 재기동 ([VM 배포 안내](DEPLOY.md)) |
 
-- CI 결과: PR 하단 Checks 또는 저장소 **Actions** 탭에서 확인, 실패 시 로그 확인 후 같은 브랜치에 수정 커밋 push
 - push 전 로컬 확인 권장: `frontend/`에서 `npm run typecheck && npm test`, `backend/`에서 `python -m pytest`
 - API 키: CI는 가짜 엔진(`ENGINE_IMPL=fake`)으로 키 미사용, 배포 키는 VM의 `~/roommate/.env`에만 보관
 - 백엔드 배포 조건: `backend/app/main.py`(FastAPI `app`) 및 `backend/requirements.txt` 존재 시 자동 포함, 그 전에는 프론트엔드 목업 모드만 배포
@@ -94,14 +87,14 @@ gitGraph
 | `frontend/` | 범찬 | 흐름 C 화면 공동 담당, API 연동 확인 |
 | `backend/` | 일준 ↔ 범찬 상호 | 동일 서버 코드 |
 | `engine/` | 범찬 | 엔진 연결 담당 |
-| `docs/API.md` | 동현 + 백엔드 1명 | 프론트 · 백엔드 간 약속 변경 PR |
+| `docs/common/API.md` | 동현 + 백엔드 1명 | 프론트 · 백엔드 간 약속 변경 PR |
 | `docs/` `data/` | 건한 | PM |
 
 - 리뷰는 요청 당일 내 처리 (6일 개발 기간 고려, PR 1일 이상 정체 방지)
 
 ## API 변경 절차
 
-1. `docs/API.md` 수정 PR 선행 (`docs/` 브랜치)
+1. `docs/common/API.md` 수정 PR 선행 (`docs/` 브랜치)
 2. 동현 및 백엔드 1명 승인
 3. 코드 변경 진행
 
@@ -126,14 +119,14 @@ gitGraph
 
 - 원칙: API 키는 팀원에게 배포하지 않음. 로컬 개발은 `ENGINE_IMPL=fake`(가짜 엔진)로 키 없이 진행, 실제 키는 VM `~/roommate/.env`에만 보관
 - 실제 엔진 테스트 필요 시 건한이 사용 한도를 건 개인별 키 발급, 작업 종료 후 폐기
-- `.env` 커밋 금지, [`backend/.env.example`](../backend/.env.example) 복사 후 사용. PR · 커밋 · 단톡 공지 내 키 기재 금지
+- `.env` 커밋 금지, [`backend/.env.example`](../../backend/.env.example) 복사 후 사용. PR · 커밋 · 단톡 공지 내 키 기재 금지
 
 | 차단 장치 | 단계 | 동작 |
 | --- | --- | --- |
 | `.gitignore` | `git add` | `.env` · 키 · 인증서 파일 추적 제외 |
-| pre-commit hook ([`.githooks/pre-commit`](../.githooks/pre-commit)) | 커밋 | `.env` 파일 · API 키 · 토큰 · 개인키 문자열 포함 시 커밋 거부 |
+| pre-commit hook ([`.githooks/pre-commit`](../../.githooks/pre-commit)) | 커밋 | `.env` 파일 · API 키 · 토큰 · 개인키 문자열 포함 시 커밋 거부 |
 | GitHub Push protection | push | 알려진 형식의 키가 포함된 push 거부 |
-| CI `secret scan` ([`scripts/check-secrets.sh`](../scripts/check-secrets.sh)) | PR | 검사 실패 시 `develop` · `main` 병합 불가 |
+| CI `secret scan` ([`scripts/check-secrets.sh`](../../scripts/check-secrets.sh)) | PR | 검사 실패 시 `develop` · `main` 병합 불가 |
 | Environment `production` | 배포 | VM 접속 정보는 `main` 배포 job에서만 접근 가능 |
 | CODEOWNERS | 리뷰 | `.github/` · `scripts/` · `deploy/` · `.gitignore` · Dockerfile 변경은 건한 승인 필수 |
 
@@ -143,5 +136,5 @@ gitGraph
 
 ## 문서 위치
 
-- 모든 문서는 `docs/`에 통합 ([문서 목록](README.md))
-- 영역별 문서: [frontend](frontend/README.md) · [backend](backend/README.md) · [engine](engine/README.md) · [data](data/SEED.md) · [배포](DEPLOY.md)
+- `docs/frontend/`: 프론트엔드 문서 · `docs/backend/`: 백엔드 문서 · `docs/common/`: 공통 문서 ([문서 목록](README.md))
+- 새 문서는 세 폴더 중 해당 영역에 작성, `docs/` 바로 아래 파일 · 폴더 추가 금지

@@ -1,6 +1,6 @@
 # VM 배포 (Docker)
 
-- `main` 반영 시 [CD 워크플로](../.github/workflows/cd.yml)가 Docker 이미지를 빌드하여 GHCR에 업로드하고, VM에서 `docker compose`로 재기동한다.
+- `main` 반영 시 [CD 워크플로](../../.github/workflows/cd.yml)가 Docker 이미지를 빌드하여 GHCR에 업로드하고, VM에서 `docker compose`로 재기동한다.
 - API 키는 VM의 `~/roommate/.env`에만 둔다. GitHub · 이미지 · 저장소에는 포함하지 않는다.
 
 ## 구성

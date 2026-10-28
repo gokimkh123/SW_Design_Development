@@ -1,7 +1,7 @@
 """임시 가짜 엔진.
 
 - engine/fake.py 도착 전까지 쓰는 백엔드 내부 대체 구현 (LLM 호출 없음)
-- 함수 이름 · 시그니처는 docs/API.md 7장과 동일
+- 함수 이름 · 시그니처는 docs/common/API.md 7장과 동일
 - 5개 축 · 대화 방식: PRD 부록 C, 점수 · 한 줄 판정: PRD 8.5
 - 대화 · 판정 · 규칙 문구는 축 차이 기반 고정 문구 (실제 엔진 결과 아님)
 - engine_adapter 의 build_persona 실패 대체(규칙 기반 문구)에도 사용
