@@ -48,7 +48,7 @@ GROUPS = [
         ("서버 세팅 · health · users", 8, 8, False),
         ("설문 · 페르소나 API", 9, 9, False),
         ("시뮬레이션 API · SSE", 10, 10, False),
-        ("실제 엔진 연결", 11, 11, False),
+        ("후보 추림 API", 11, 11, False),
         ("부스 실행 환경", 12, 12, False),
         ("통합 버그 수정", 13, 13, False),
     ]),

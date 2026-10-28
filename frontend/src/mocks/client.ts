@@ -55,11 +55,11 @@ function persist(): void {
   }));
 }
 const candidateSeed: Candidate[] = [
-  { candidate_id: 'per_daeun', alias: '후보 A', department: '간호학과', year: 1, type_name: '깔끔한 집순이', pre_score: 86, highlight: '청결 기준 비슷', simulation: null },
-  { candidate_id: 'per_minseo', alias: '후보 B', department: '디자인학과', year: 2, type_name: '유연한 저녁형', pre_score: 78, highlight: '대화 방식 비슷', simulation: null },
-  { candidate_id: 'per_jiyun', alias: '후보 C', department: '컴퓨터공학과', year: 1, type_name: '활발한 올빼미형', pre_score: 69, highlight: '서로의 생활 존중', simulation: null },
+  { candidate_id: 'per_daeun', alias: '후보 A', department: '간호학과', year: 1, type_name: '깔끔한 집순이', pre_score: 91, highlight: '청결 기준 비슷', simulation: null },
+  { candidate_id: 'per_jiho', alias: '후보 B', department: '컴퓨터공학과', year: 1, type_name: '조용한 독서가', pre_score: 87, highlight: '소음 민감도 비슷', simulation: null },
+  { candidate_id: 'per_subin', alias: '후보 C', department: '경영학과', year: 1, type_name: '자유로운 올빼미', pre_score: 77, highlight: '수면 리듬 차이 큼', simulation: null },
 ];
-const partnerNames: Record<string, string> = { per_daeun: '다은', per_minseo: '민서', per_jiyun: '지윤' };
+const partnerNames: Record<string, string> = { per_daeun: '다은', per_jiho: '지호', per_subin: '수빈' };
 
 const sceneTitles = [
   '첫날 짐 정리', '아침 알람', '책상 조명', '조용한 시간', '분리수거',
@@ -74,14 +74,14 @@ const ruleTexts = [
   '칸 나누기 · 공용 칸 주 1회 정리', '밤 23도 · 외출 시 끄기', '휴지·세제 번갈아 구매 · 앱 정산',
 ];
 const ruleScenes = [4, 7, 16, 14, 6, 11];
-const scoreByCandidate: Record<string, number> = { per_daeun: 88, per_minseo: 76, per_jiyun: 68 };
+const scoreByCandidate: Record<string, number> = { per_daeun: 88, per_jiho: 84, per_subin: 71 };
 const candidateAxes: Record<string, Axes> = {
   per_daeun: { sleep_rhythm: 25, noise_sensitivity: 67, cleanliness: 100, sociability: 33, sharing_tolerance: 33 },
-  per_minseo: { sleep_rhythm: 60, noise_sensitivity: 50, cleanliness: 68, sociability: 70, sharing_tolerance: 66 },
-  per_jiyun: { sleep_rhythm: 86, noise_sensitivity: 28, cleanliness: 54, sociability: 91, sharing_tolerance: 82 },
+  per_jiho: { sleep_rhythm: 50, noise_sensitivity: 67, cleanliness: 67, sociability: 0, sharing_tolerance: 0 },
+  per_subin: { sleep_rhythm: 83, noise_sensitivity: 33, cleanliness: 84, sociability: 33, sharing_tolerance: 0 },
 };
 /** Provisional visual values only; the monthly-conflicts formula is not approved. */
-const previewMonthlyConflicts: Record<string, number> = { per_daeun: 0.5, per_minseo: 1.2, per_jiyun: 2.3 };
+const previewMonthlyConflicts: Record<string, number> = { per_daeun: 0.5, per_jiho: 1, per_subin: 4 };
 
 function findSimulation(id: string): Simulation {
   requireUser();
