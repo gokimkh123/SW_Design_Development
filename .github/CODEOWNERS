@@ -2,7 +2,19 @@
 # 건한 @gokimkh123 · 동현 @gymdong · 일준 @Y-IlJun · 범찬 @02chan
 
 /docs/      @gokimkh123
+/docs/frontend/  @gymdong @gokimkh123
+/docs/backend/   @Y-IlJun @02chan @gokimkh123
+/docs/data/      @gokimkh123 @02chan
 /engine/    @gokimkh123 @02chan
 /data/      @gokimkh123 @02chan
 /frontend/  @gymdong
 /backend/   @Y-IlJun @02chan
+
+# 보안 · 배포 설정: 건한 리뷰 필수 (비밀 정보 유출 방지)
+/.github/        @gokimkh123
+/.githooks/      @gokimkh123
+/scripts/        @gokimkh123
+/deploy/         @gokimkh123
+/.gitignore      @gokimkh123
+/.dockerignore   @gokimkh123
+Dockerfile       @gokimkh123
