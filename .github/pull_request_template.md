@@ -20,4 +20,4 @@
 - [ ] API 변경 시 `docs/API.md` 동시 수정
 - [ ] 문서 변경 시 문어체 또는 개조식 정리 (`develop` → `main` 병합 전)
 - [ ] `.env` · API 키 커밋 미포함 확인
-- [ ] 리뷰어 지정 (리뷰 짝: `CONTRIBUTING.md` 참고)
+- [ ] 리뷰어 지정 (리뷰 짝: `docs/CONTRIBUTING.md` 참고)

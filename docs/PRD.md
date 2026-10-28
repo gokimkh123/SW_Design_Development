@@ -5,10 +5,10 @@
 | 항목 | 내용 |
 | --- | --- |
 | 문서 버전 | v1.2 (2026-10-19) · 문어체 개조식 정리 |
-| 기반 문서 | [룸메궁합 서비스 기획서 v1.0](../룸메궁합_서비스기획서_v1.0.pdf) (2026-10-13) |
+| 기반 문서 | [룸메궁합 서비스 기획서 v1.0](룸메궁합_서비스기획서_v1.0.pdf) (2026-10-13) |
 | 과목 | 2026 SW 시스템 설계 및 개발 II |
 | 팀 | 건한(PM · AI 엔진) · 동현(프론트엔드) · 일준 · 범찬(백엔드) |
-| 관련 문서 | [API 명세서](API.md) · [일정 · 간트 차트](SCHEDULE.md) · [협업 가이드](../CONTRIBUTING.md) |
+| 관련 문서 | [API 명세서](API.md) · [일정 · 간트 차트](SCHEDULE.md) · [협업 가이드](CONTRIBUTING.md) |
 
 ![주요 화면: 생활 페르소나 · 가상 동거 · 생활 규칙](images/hero.png)
 
@@ -488,8 +488,8 @@ flowchart LR
 | AI 엔진 | Python, Anthropic Python SDK, Claude Haiku 5.5 | 8.6 참고 |
 | 실시간 | SSE (Server-Sent Events) | 서버 → 클라이언트 단방향 장면 스트리밍에 충분 |
 | 실행 환경 | 발표회는 노트북 로컬 실행 기본. 여유 시 프론트 Vercel · 백엔드 Render 배포 및 QR 접속 | 행사장 네트워크 불안정 시에도 시연 가능 |
-| 협업 | GitHub Pull Request (작업 브랜치 → `develop` → `main`) | [협업 가이드](../CONTRIBUTING.md) 참고 |
-| CI/CD | GitHub Actions: CI(프론트엔드 · 백엔드 검사), CD(`main` → Docker 이미지 → VM 배포) | [VM 배포 안내](../deploy/README.md) 참고 |
+| 협업 | GitHub Pull Request (작업 브랜치 → `develop` → `main`) | [협업 가이드](CONTRIBUTING.md) 참고 |
+| CI/CD | GitHub Actions: CI(프론트엔드 · 백엔드 검사), CD(`main` → Docker 이미지 → VM 배포) | [VM 배포 안내](DEPLOY.md) 참고 |
 
 ### 10.3 데이터 모델 (초안)
 
@@ -567,11 +567,16 @@ erDiagram
 ```text
 SW_Design_Development/
 ├── README.md
-├── CONTRIBUTING.md     # 협업 가이드 (브랜치, 커밋, PR, 리뷰)
 ├── LICENSE
 ├── .github/            # PR · 버그 템플릿, CODEOWNERS, workflows(CI/CD)
-├── deploy/             # VM 배포 docker-compose · 안내
-├── docs/               # PRD, API 명세서, 일정, 이미지, 간트 차트 스크립트
+├── .githooks/          # pre-commit (비밀 정보 커밋 차단)
+├── scripts/            # check-secrets.sh
+├── deploy/             # VM 배포 docker-compose
+├── docs/               # 전체 문서 (PRD, API, 일정, 협업 가이드, 배포, 이미지)
+│   ├── frontend/       #   프론트엔드 실행 안내 · 구현 계획
+│   ├── backend/        #   백엔드 안내 · 프론트엔드 인수인계
+│   ├── engine/         #   엔진 설계
+│   └── data/           #   시드 데이터 형식
 ├── frontend/           # React 모바일 웹 (동현)
 ├── backend/            # FastAPI 서버 (일준 · 범찬)
 │   ├── app/            #   엔진 어댑터 · 임시 가짜 엔진 (서버 코드 예정)
@@ -820,6 +825,6 @@ flowchart LR
 
 ## 참고 자료
 
-- [룸메궁합 서비스 기획서 v1.0 (PDF)](../룸메궁합_서비스기획서_v1.0.pdf)
+- [룸메궁합 서비스 기획서 v1.0 (PDF)](룸메궁합_서비스기획서_v1.0.pdf)
 - Park, J. S. et al. (2024). *Generative Agent Simulations of 1,000 People*. [arXiv:2411.10109](https://arxiv.org/abs/2411.10109)
 - 기획서 인용 출처: 대학알리미 2025.10 공시(대학저널 2025.11.4), 뉴시스 2026.5.27(알스퀘어 보고서), Nationwide · Censuswide 조사 2026.8.13, GSL Index, Korea JoongAng Daily 2026.3.24, mwm.ai Roome, RoomSync, StarRez
