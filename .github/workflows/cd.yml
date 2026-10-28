@@ -1,0 +1,52 @@
+# CD: main 반영 시 프론트엔드 목업 빌드를 GitHub Pages로 배포
+# 백엔드 서버 미확정 → 목업 모드(VITE_USE_MOCK=true)로 배포, API 키 미사용
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: build frontend (mock)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/configure-pages@v5
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx vite build --base=/${{ github.event.repository.name }}/
+        env:
+          VITE_USE_MOCK: "true"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    name: deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

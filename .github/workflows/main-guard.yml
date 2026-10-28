@@ -1,0 +1,24 @@
+# main 병합 규칙: develop → main PR만 허용
+name: main guard
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-branch:
+    name: source branch is develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR 출발 브랜치 확인
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ]; then
+            echo "::error::main으로의 PR은 develop 브랜치에서만 허용 (현재: $HEAD_REF). 작업 브랜치는 develop으로 PR 생성"
+            exit 1
+          fi
+          echo "출발 브랜치 develop 확인"

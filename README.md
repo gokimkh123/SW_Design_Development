@@ -10,6 +10,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Course](https://img.shields.io/badge/Course-SW%20Design%20%26%20Development%20II-0f766e)
 ![Project Expo](https://img.shields.io/badge/Project%20Expo-2026.11.03-f59e0b)
+[![CI](https://github.com/gokimkh123/SW_Design_Development/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/gokimkh123/SW_Design_Development/actions/workflows/ci.yml)
+[![CD](https://github.com/gokimkh123/SW_Design_Development/actions/workflows/cd.yml/badge.svg)](https://github.com/gokimkh123/SW_Design_Development/actions/workflows/cd.yml)
 
 <img src="docs/images/hero.png" alt="생활 페르소나, 가상 동거, 생활 규칙 화면" width="760"/>
 
@@ -171,6 +173,7 @@ flowchart LR
 | 프론트엔드 | React · TypeScript · Vite · Tailwind CSS |
 | 백엔드 | Python · FastAPI · SQLite · SSE |
 | AI 엔진 | Claude API (Haiku 5.5), 모델 교체 가능 구조 |
+| CI/CD | GitHub Actions, GitHub Pages (목업 데모: <https://gokimkh123.github.io/SW_Design_Development/>) |
 
 ---
 
@@ -184,7 +187,7 @@ flowchart LR
 | [로컬 개발 실행 가이드](docs/LOCAL_DEVELOPMENT.md) | 팀원별 clone·프론트엔드 실행·백엔드 준비 및 실연동 절차 |
 | [프론트엔드 ↔ 백엔드 인수인계](docs/FRONTEND_BACKEND_HANDOFF.md) | 실연동 데이터·미정 계약·검증 사례 (협의용) |
 | [일정 · 간트 차트](docs/SCHEDULE.md) | 사람별 간트 차트, 마일스톤, 날짜별 할 일 |
-| [협업 가이드](CONTRIBUTING.md) | 브랜치 · 커밋 · PR · 리뷰 규칙 |
+| [협업 가이드](CONTRIBUTING.md) | 브랜치 · 커밋 · PR · 리뷰 규칙, CI/CD |
 | [서비스 기획서 v1.0 (PDF)](룸메궁합_서비스기획서_v1.0.pdf) | 제안 배경, 화면 설계, 수익 모델, 사업 확장 방안 |
 
 ## 라이선스
