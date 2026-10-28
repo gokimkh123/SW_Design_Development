@@ -11,7 +11,7 @@ cd SW_Design_Development
 
 Git, Node.js 20.19 이상(또는 22.12 이상), npm을 준비한다. 백엔드 담당자는 Python 3와 `venv`도 준비한다. 프론트엔드 버전 조건은 [Vite 프로젝트 실행 안내](../frontend/README.md#실행)를 따른다.
 
-**브랜치 주의:** 프론트엔드 구현이 `main`에 병합되기 전에는 기본 브랜치를 clone한 직후 아래 파일이 없을 수 있다. 이 경우 공유된 `feat/frontend-ui` 브랜치 또는 PR을 확인하고, 해당 브랜치를 체크아웃하거나 병합 후 최신 코드를 받은 다음 진행한다. 공동 문서 변경은 별도 `docs/frontend-handoff` 브랜치에서 검토한다.
+**브랜치 안내:** 프론트엔드 구현(PR #30)과 본 문서(PR #31)는 `main`에 병합 완료. `main`을 clone 또는 pull한 뒤 바로 진행한다.
 
 ## 2. 프론트엔드만 실행 — 백엔드 불필요
 

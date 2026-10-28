@@ -33,7 +33,7 @@
 
 - 화면 디자인: [기획서 PDF](../룸메궁합_서비스기획서_v1.0.pdf) 4~8쪽 목업 준수
 - P0 작업 순서·연동·완료 기준: [프론트엔드 구현 계획](FRONTEND_PLAN.md)
-- 실연동 데이터 · 미정 계약 · 검증 자료는 별도 `docs/` 문서 PR에서 팀 협의
+- 실연동 데이터 · 미정 계약 · 검증 자료: [프론트엔드 ↔ 백엔드 인수인계](../docs/FRONTEND_BACKEND_HANDOFF.md)
 
 ## 개발 방법
 
@@ -45,7 +45,7 @@
 
 - Node.js 20.19 이상(또는 22.12 이상) 필요
 - 아래 명령은 프로젝트 루트 기준
-- 팀원별 clone · Windows 명령 · 백엔드 연결은 별도 `docs/` 문서 PR에서 공유
+- 팀원별 clone · Windows 명령 · 백엔드 연결: [로컬 개발 실행 가이드](../docs/LOCAL_DEVELOPMENT.md)
 
 ```bash
 cd frontend

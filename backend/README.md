@@ -26,3 +26,4 @@
 
 - Python 가상환경과 `.env` 준비 명령은 [로컬 개발 실행 가이드](../docs/LOCAL_DEVELOPMENT.md)를 참고
 - **현재 실행 불가:** 의존성 명세(`requirements.txt` 또는 `pyproject.toml`)와 FastAPI 앱 진입점이 아직 없다. 구현 후 설치·서버 실행 명령을 이 README에 추가하고 실제 동작을 확인할 것
+- **현재 실행 가능:** 엔진 어댑터 · 임시 가짜 엔진 · 시드 데이터 테스트 (`cd backend && python -m pytest -q`, pytest 필요)
