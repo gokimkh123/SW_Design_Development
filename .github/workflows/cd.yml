@@ -1,6 +1,7 @@
 # CD: main 반영 시 Docker 이미지 빌드 → GHCR 업로드 → VM에서 docker compose 재기동
 # 백엔드 서버(backend/app/main.py · backend/requirements.txt) 준비 전에는 프론트엔드만 목업 모드로 배포
-# VM 접속 정보(Secrets: VM_HOST · VM_USER · VM_SSH_KEY, 선택 VM_SSH_PORT) 미등록 시 배포 단계 생략
+# VM 접속 정보: Environment `production`(main 전용)의 Secrets VM_HOST · VM_USER · VM_SSH_KEY, 선택 VM_SSH_PORT
+# 미등록 시 배포 단계 생략
 name: CD
 
 on:
@@ -77,6 +78,8 @@ jobs:
     name: deploy to VM
     needs: build
     runs-on: ubuntu-latest
+    # main 브랜치 전용 Environment → 작업 브랜치 워크플로에서 VM Secrets 접근 불가
+    environment: production
     permissions:
       contents: read
       packages: read

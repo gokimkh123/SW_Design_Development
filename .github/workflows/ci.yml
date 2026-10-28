@@ -17,6 +17,14 @@ permissions:
   contents: read
 
 jobs:
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: .env · API 키 · 개인키 커밋 여부 검사
+        run: sh scripts/check-secrets.sh
+
   frontend:
     name: frontend (typecheck · test · build)
     runs-on: ubuntu-latest

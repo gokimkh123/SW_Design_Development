@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# 커밋 전 비밀 정보 검사 (설치: git config core.hooksPath .githooks)
+exec sh scripts/check-secrets.sh --staged

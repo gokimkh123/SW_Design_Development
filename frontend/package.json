@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "prepare": "git config core.hooksPath .githooks || true",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "esbuild tests/logic.test.ts --bundle --platform=node --format=esm --outfile=.test-dist/logic.test.mjs && node --test .test-dist/logic.test.mjs"
