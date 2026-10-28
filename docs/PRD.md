@@ -489,7 +489,7 @@ flowchart LR
 | 실시간 | SSE (Server-Sent Events) | 서버 → 클라이언트 단방향 장면 스트리밍에 충분 |
 | 실행 환경 | 발표회는 노트북 로컬 실행 기본. 여유 시 프론트 Vercel · 백엔드 Render 배포 및 QR 접속 | 행사장 네트워크 불안정 시에도 시연 가능 |
 | 협업 | GitHub Pull Request (작업 브랜치 → `develop` → `main`) | [협업 가이드](../CONTRIBUTING.md) 참고 |
-| CI/CD | GitHub Actions: CI(프론트엔드 · 백엔드 검사), CD(`main` → GitHub Pages 목업 배포) | [협업 가이드](../CONTRIBUTING.md#cicd) 참고 |
+| CI/CD | GitHub Actions: CI(프론트엔드 · 백엔드 검사), CD(`main` → Docker 이미지 → VM 배포) | [VM 배포 안내](../deploy/README.md) 참고 |
 
 ### 10.3 데이터 모델 (초안)
 
@@ -570,6 +570,7 @@ SW_Design_Development/
 ├── CONTRIBUTING.md     # 협업 가이드 (브랜치, 커밋, PR, 리뷰)
 ├── LICENSE
 ├── .github/            # PR · 버그 템플릿, CODEOWNERS, workflows(CI/CD)
+├── deploy/             # VM 배포 docker-compose · 안내
 ├── docs/               # PRD, API 명세서, 일정, 이미지, 간트 차트 스크립트
 ├── frontend/           # React 모바일 웹 (동현)
 ├── backend/            # FastAPI 서버 (일준 · 범찬)

@@ -1,5 +1,6 @@
-# CD: main 반영 시 프론트엔드 목업 빌드를 GitHub Pages로 배포
-# 백엔드 서버 미확정 → 목업 모드(VITE_USE_MOCK=true)로 배포, API 키 미사용
+# CD: main 반영 시 Docker 이미지 빌드 → GHCR 업로드 → VM에서 docker compose 재기동
+# 백엔드 서버(backend/app/main.py · backend/requirements.txt) 준비 전에는 프론트엔드만 목업 모드로 배포
+# VM 접속 정보(Secrets: VM_HOST · VM_USER · VM_SSH_KEY, 선택 VM_SSH_PORT) 미등록 시 배포 단계 생략
 name: CD
 
 on:
@@ -8,45 +9,121 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/roommate
 
 jobs:
   build:
-    name: build frontend (mock)
+    name: build · push images
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      services: ${{ steps.detect.outputs.services }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: 배포 대상 판별
+        id: detect
+        run: |
+          if [ -f backend/app/main.py ] && [ -f backend/requirements.txt ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "mock=false" >> "$GITHUB_OUTPUT"
+            echo "services=frontend backend" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::백엔드 서버 미구현 → 프론트엔드만 목업 모드로 배포"
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+            echo "mock=true" >> "$GITHUB_OUTPUT"
+            echo "services=frontend" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - uses: actions/configure-pages@v5
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npx vite build --base=/${{ github.event.repository.name }}/
-        env:
-          VITE_USE_MOCK: "true"
-      - uses: actions/upload-pages-artifact@v3
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: frontend 이미지
+        uses: docker/build-push-action@v6
         with:
-          path: frontend/dist
+          context: frontend
+          build-args: VITE_USE_MOCK=${{ steps.detect.outputs.mock }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-frontend:latest
+            ${{ env.IMAGE_PREFIX }}-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+      - name: backend 이미지
+        if: steps.detect.outputs.backend == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-backend:latest
+            ${{ env.IMAGE_PREFIX }}-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
   deploy:
-    name: deploy to GitHub Pages
+    name: deploy to VM
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      packages: read
+    env:
+      VM_HOST: ${{ secrets.VM_HOST }}
+      VM_USER: ${{ secrets.VM_USER }}
+      VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+      VM_SSH_PORT: ${{ secrets.VM_SSH_PORT }}
+      SERVICES: ${{ needs.build.outputs.services }}
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+
+      - name: VM 접속 정보 확인
+        id: check
+        run: |
+          if [ -z "$VM_HOST" ] || [ -z "$VM_USER" ] || [ -z "$VM_SSH_KEY" ]; then
+            echo "::warning::VM Secrets(VM_HOST · VM_USER · VM_SSH_KEY) 미등록 → 이미지 업로드만 완료, 배포 생략"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: SSH 설정
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/id_vm
+          chmod 600 ~/.ssh/id_vm
+          ssh-keyscan -p "${VM_SSH_PORT:-22}" -H "$VM_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: compose 파일 전송 · 컨테이너 재기동
+        if: steps.check.outputs.ready == 'true'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          SSH="ssh -i $HOME/.ssh/id_vm -p ${VM_SSH_PORT:-22} $VM_USER@$VM_HOST"
+          $SSH 'mkdir -p ~/roommate'
+          scp -i ~/.ssh/id_vm -P "${VM_SSH_PORT:-22}" deploy/docker-compose.yml "$VM_USER@$VM_HOST:roommate/docker-compose.yml"
+          # 토큰은 표준 입력으로만 전달 (명령줄 노출 방지)
+          $SSH 'bash -s' <<EOF
+          set -euo pipefail
+          cd ~/roommate
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker compose pull $SERVICES
+          docker compose up -d --remove-orphans $SERVICES
+          docker logout ghcr.io
+          docker image prune -f
+          docker compose ps
+          EOF
