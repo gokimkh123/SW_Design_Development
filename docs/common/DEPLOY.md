@@ -21,7 +21,7 @@ flowchart LR
 
 - 백엔드 서버 코드 준비 전: 프론트엔드만 **목업 모드**(`VITE_USE_MOCK=true`)로 배포
 - 백엔드 서버 코드 병합 후: 프론트엔드 실서버 모드 + 백엔드 함께 배포 (별도 설정 불필요)
-- 태그: `latest`, 커밋 SHA (롤백 시 SHA 태그 사용)
+- 태그: `latest`, 커밋 SHA (롤백 방법은 아래 롤백 절 참고)
 
 ## 백엔드 서버 코드 조건
 
@@ -32,7 +32,7 @@ flowchart LR
 
 ## VM 최초 준비 (1회, 건한)
 
-1. Docker Engine 및 Compose 플러그인 설치 (`docker compose version`으로 확인)
+1. Docker Engine 및 Compose 플러그인 v2.24 이상 설치 (`docker compose version`으로 확인, `env_file`의 `required: false` 지원 버전)
 2. 배포 계정을 `docker` 그룹에 추가: `sudo usermod -aG docker <계정>` 후 재접속
 3. 배포 전용 SSH 키 생성 (로컬, 저장소 폴더 밖): `ssh-keygen -t ed25519 -f ~/.ssh/roommate_deploy -N ""`
 4. 공개키(`roommate_deploy.pub`)를 VM 배포 계정의 `~/.ssh/authorized_keys`에 추가
@@ -46,15 +46,21 @@ ANTHROPIC_API_KEY=<API 키>
 LLM_PROVIDER=anthropic
 LLM_MODEL=claude-haiku-5-5
 LLM_MAX_CONCURRENCY=8
-ENGINE_IMPL=real
+# 엔진 패키지(engine/__init__.py · engine/models.py) main 반영 전까지 fake 유지, 반영 후 real로 변경
+ENGINE_IMPL=fake
 SIM_MODE=agents
 REPLAY_DELAY_MS=600
 ENV
 chmod 600 .env
 ```
 
+- `ENGINE_IMPL=real`을 엔진 패키지 반영 전에 설정하면 `engine.models` import 실패로 백엔드 오류 발생
+- `.env` 변경 후 반영: `docker compose up -d backend`
+
 6. 방화벽에서 `WEB_PORT`(기본 80) 및 SSH 포트 허용
-7. GitHub 저장소 **Settings → Environments → `production` → Environment secrets → Add secret** 등록 (Repository secret 사용 금지: 작업 브랜치 워크플로에서 접근 가능)
+7. GitHub 저장소 **Settings → Environments → `production`** 확인
+   - **Deployment branches and tags**: `Selected branches and tags` → `main`만 등록 (10/28 설정 완료, 변경 금지: 해제 시 다른 브랜치 워크플로에서 Secrets 접근 가능)
+8. 같은 화면 **Environment secrets → Add secret**으로 아래 값 등록 (Repository secret 사용 금지: 모든 브랜치 워크플로에서 접근 가능)
 
 | Secret | 값 | 필수 |
 | --- | --- | --- |
@@ -64,15 +70,23 @@ chmod 600 .env
 | `VM_SSH_PORT` | SSH 포트 | 선택 (기본 22) |
 
 - Secrets 미등록 시 CD는 이미지 업로드까지만 수행하고 배포 단계 생략 (경고 표시)
-- 등록 후 **Actions → CD → Run workflow**로 수동 배포 가능
+- 등록 후 **Actions → CD → Run workflow**(브랜치 `main` 선택)로 수동 배포 가능. 다른 브랜치 선택 시 빌드 · 배포 생략
 - VM이 외부(GitHub Actions)에서 SSH 접속 불가한 사설망인 경우: self-hosted runner 방식으로 전환 필요
 
 ## 운영 명령 (VM)
 
+- 서비스 이름 명시: 백엔드 배포 전에는 `frontend`만, 배포 후에는 `frontend backend` (백엔드 이미지가 없는 상태에서 서비스 이름 없이 `pull` · `up` 실행 시 실패)
+
 | 목적 | 명령 (`~/roommate`에서) |
 | --- | --- |
 | 상태 확인 | `docker compose ps` |
-| 로그 확인 | `docker compose logs -f backend` |
+| 로그 확인 | `docker compose logs -f frontend` (백엔드: `backend`) |
 | 재시작 | `docker compose restart` |
-| 롤백 | `docker-compose.yml`의 `:latest`를 이전 커밋 SHA로 변경 후 `docker compose up -d` |
+| 설정 반영 | `docker compose up -d frontend` (백엔드 배포 후: `frontend backend`) |
 | 중지 | `docker compose down` (DB 볼륨 유지) |
+
+## 롤백
+
+- 방법: GitHub **Actions → CD** → 되돌릴 시점의 성공 실행 선택 → **Re-run all jobs**
+- 동작: 해당 시점 커밋으로 이미지 재빌드 → `latest` 갱신 → VM 재배포 (VM 로그인 · 파일 수정 불필요)
+- 이후 `main`에 새 커밋 반영 시 다시 최신 버전으로 배포되므로, 문제 코드는 담당 브랜치에서 수정 후 재반영

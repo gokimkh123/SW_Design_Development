@@ -1,5 +1,7 @@
 # 룸메궁합 프론트엔드 P0 구현 계획
 
+> 10/26 작성 시점의 계획 문서. 이후 앱 · 테스트 구현 완료, 시드 인물 초안 추가, API 명세의 `mode` 정리(`live` · `replay`) 반영됨. 브랜치 · 병합 절차는 [협업 가이드](../common/CONTRIBUTING.md#작업-흐름) 기준이며, 본문의 `파일:줄` 인용은 작성 시점 기준.
+
 ## 1. 목표와 고정 범위
 
 **결과:** 방문객이 모바일 웹에서 닉네임 입력 → 12문항 설문 → 페르소나 생성 → 익명 후보 3명 시뮬레이션 관람 → 리포트 → 시드 후보 매칭 → 생활 규칙 6개 동의까지 혼자 완료한다. 발표회 목표는 5분 이내 체험, 11/1 기능 동결, 11/2 리허설이다. `docs/common/PRD.md:113-145`, `docs/common/SCHEDULE.md:41-56`.
@@ -31,14 +33,14 @@
 3. **10/29 — 흐름 B mock 완성:** 후보 3명을 익명 표시하고 후보별 `queued/running/completed/failed`를 독립 모델로 둔다. PRD상 상위 후보의 시뮬레이션 자동 수행을 계획하되 실제 시작 방식·동시성은 백엔드와 10/28에 확인한다. B2는 이벤트별 순수 상태 갱신 로직을 분리해 `id` 중복/순서·보류 판정·규칙 후보를 처리한다. B3는 미완료/완료 두 상태를 모두 구현한다. `docs/common/PRD.md:280-293`, `docs/common/API.md:144-244,425-449,539-592`, `docs/common/SCHEDULE.md:48-52`.
 4. **10/30 — 흐름 B 실연동:** 실제 SSE에 연결하고 정상 종료·재연결·중복 재전송·오류·폴링 대체를 확인한다. 폴링 API는 대화 전문이 아닌 상태·진행률만 제공하므로, 저하 모드에서는 대화 빈칸을 사실대로 안내하고 완료 뒤 B3 리포트로 이동한다. `429/503`은 재시도 또는 서버 리플레이 전환 안내로 표시하되, 프론트가 존재하지 않는 시뮬레이션 결과를 꾸며내지 않는다. 각 후보의 완료/점수와 B3 리포트가 일치하는지 확인한다. `docs/common/API.md:167-185,425-449,539-606`, `docs/common/PRD.md:703-711`, `docs/common/SCHEDULE.md:49-53`.
 5. **10/31 — 흐름 C 및 백엔드 협업:** 범찬과 C1/C2 화면 및 매칭·규칙 API를 맞춘다. 매칭 신청은 완료된 `simulation_id`에 한정하고, `accepted` 응답 후만 실명 공개한다. 6개 규칙·출처·동의를 끝까지 연결한다. `docs/common/PRD.md:250-259,677-691`, `docs/common/API.md:450-478`, `docs/common/SCHEDULE.md:50-54`.
-6. **11/1 — 기능 동결 전 통합:** mock OFF에서 A1→C2 방문객 경로를 반복하고, 로딩/빈 응답/4xx/5xx/네트워크 끊김/새로고침을 확인한다. P1/P2로 이동하지 않고 P0 결함을 닫는다. 범찬의 frontend PR 리뷰 후 main 실행 상태를 유지한다. `docs/common/SCHEDULE.md:52-61`, `docs/common/CONTRIBUTING.md:15-33,55-69`.
+6. **11/1 — 기능 동결 전 통합:** mock OFF에서 A1→C2 방문객 경로를 반복하고, 로딩/빈 응답/4xx/5xx/네트워크 끊김/새로고침을 확인한다. P1/P2로 이동하지 않고 P0 결함을 닫는다. `frontend` push 후 CI 통과 및 `develop` 자동 병합을 확인하고, 범찬은 반영 내용을 리뷰한다. `docs/common/SCHEDULE.md:52-61`, `docs/common/CONTRIBUTING.md#작업-흐름`.
 7. **11/2 — 리허설:** 세 번 연속 관람객 경로를 수행하고 5분 체험, 화면 가독성, 리플레이 복구 경로를 기록한다. 11/1 이후에는 기능 추가보다 장애 수정과 실행 절차 확인에 집중한다. `docs/common/PRD.md:129-145,598-658`, `docs/common/SCHEDULE.md:52-57`.
 
 ## 4. 먼저 확인할 계약/협업 항목
 
 | 확인 대상 | 필요한 결정·근거 | 실패 시 대응 |
 | --- | --- | --- |
-| SSE 사용자 식별 | 공통 규칙은 `X-User-Id`를 요구하지만 SSE 프론트 예시는 URL만 사용한다. SSE에서 헤더 예외/인증 방식을 일준과 10/28까지 확정한다. `docs/common/API.md:29-35,290-292,539-592` | 결정 전 mock 이벤트와 순수 상태 로직 개발; API 명세 변경은 문서 PR 선행. `docs/common/CONTRIBUTING.md:67-71` |
+| SSE 사용자 식별 | 공통 규칙은 `X-User-Id`를 요구하지만 SSE 프론트 예시는 URL만 사용한다. SSE에서 헤더 예외/인증 방식을 일준과 10/28까지 확정한다. `docs/common/API.md:29-35,290-292,539-592` | 결정 전 mock 이벤트와 순수 상태 로직 개발; API 명세 변경은 문서 PR 선행. `docs/common/CONTRIBUTING.md#api-변경-절차` |
 | 시뮬레이션 `mode` | 공통 값에는 `agents/single/replay`, POST 예시에는 `live/replay`가 적혀 있다. 클라이언트는 엔드포인트의 `live/replay` 기준으로 설계하되 실제 요청값은 일준과 확인한다. `docs/common/API.md:36-46,425-437` | 불일치 시 API 문서 합의 후 수정; 값 임의 추측 금지. |
 | 후보 3명 자동 실행 | PDF 6쪽/PRD는 후보별 자동 시뮬레이션, API는 프론트의 후보별 POST를 보여준다. 시작 시점·동시 요청 수·B1 상태 갱신 방식을 일준/범찬과 합의한다. `docs/common/PRD.md:280-293`, `docs/common/API.md:48-99,414-441` | 후보별 idempotent POST와 2초 상태 폴링을 기본 설계로 유지. |
 | 설문·시드 준비 | 설문 12문항/시드 후보는 다른 담당이 준비하며 현재 `data/seed/`에는 README뿐이다. `docs/common/SEED.md:1-14`, `docs/common/PRD.md:719-730` | mock은 API 예시 형식으로 화면 제작; 실연동 전 실제 응답 형태 확인. |
@@ -46,7 +48,7 @@
 
 ## 5. 검증 계획과 합격선
 
-- **정적 검사:** 매 PR에서 TypeScript 타입체크와 Vite 프로덕션 빌드가 성공해야 한다. 실제 명령은 부트스트랩 시 `package.json`에 기록하고 README에 실행법을 남긴다. `docs/frontend/README.md:27-35`, `docs/common/CONTRIBUTING.md:15-33`.
+- **정적 검사:** 매 push(CI)에서 TypeScript 타입체크와 Vite 프로덕션 빌드가 성공해야 한다. 실제 명령은 부트스트랩 시 `package.json`에 기록하고 README에 실행법을 남긴다. `docs/frontend/README.md:27-35`, `docs/common/CONTRIBUTING.md#cicd`.
 - **로직 회귀:** 추가 패키지 없이 가능한 순수 함수(`survey` 답변 완성 판정, 후보 상태 병합, SSE 이벤트 ID 중복 제거·20장면 진행률, 리포트의 `null/pending` 표시값)를 컴파일된 JS 대상으로 Node 내장 테스트로 먼저 고정한다. UI 자동화 도구 도입은 별도 승인 사항으로 남긴다. `docs/common/API.md:216-244,317-394,539-592`.
 - **모바일/접근성 수동 검사:** 390×844 및 작은 뷰포트에서 가로 넘침·하단 CTA 가림·키보드 조작·선택 상태·로딩/오류 안내·긴 한국어 문구 줄바꿈을 확인한다. PDF 5–7쪽과 화면별 스크린샷을 비교한다. `docs/common/PRD.md:448-456`, `docs/frontend/README.md:25`.
 - **통합 경로:** mock ON과 실제 `/api` 각각에서 A1→A4→B1→B2→B3→C1→C2를 완주한다. 매칭 전 실명 비노출, 승인된 설문 12문항, 후보 3명, SSE 정상 경로의 장면 20개, 규칙 6개, 최종 `confirmed`를 기록한다. 401/409/429/503 및 SSE 재연결·중복 이벤트·리플레이 경로도 최소 1회 확인한다. SSE를 의도적으로 끊는 저하 시험에서는 B2가 대화를 꾸며내지 않고 상태·진행률만 표시하다가 완료 후 B3로 이동해야 한다. `docs/common/API.md:25-99,167-185,290-478,539-606`, `docs/common/PRD.md:113-145`.
@@ -55,11 +57,11 @@
 ## 6. 주요 위험과 중지 조건
 
 - 프론트엔드 한 명이 9개 화면을 담당한다. 공통 셸·API 경계를 먼저 만들어 중복을 줄이고 C는 범찬 지원을 활용한다. P1/P2는 일정 회복용 대체물이 아니다. `docs/common/PRD.md:677-711`.
-- 백엔드/설문/리플레이 데이터가 늦으면 UI는 계약 기반 mock으로 전진한다. **실 API 결과와 다르면 화면을 임의로 맞추지 말고 계약을 합의한 뒤** 수정한다. `docs/common/API.md:658-680`, `docs/common/CONTRIBUTING.md:67-71`.
+- 백엔드/설문/리플레이 데이터가 늦으면 UI는 계약 기반 mock으로 전진한다. **실 API 결과와 다르면 화면을 임의로 맞추지 말고 계약을 합의한 뒤** 수정한다. `docs/common/API.md:658-680`, `docs/common/CONTRIBUTING.md#api-변경-절차`.
 - SSE 연결이나 LLM 장애가 실연동을 막으면 폴링/리플레이 절차를 검증한다. 그것도 되지 않으면 정상 완주를 주장하지 않고 블로커와 재현 단계를 기록한다. `docs/common/API.md:438-445,539-606`, `docs/common/PRD.md:648-658`.
 - 본 계획의 작성은 프론트엔드 코드 생성·설치를 수행하지 않는다. 실제 구현은 별도 실행 작업이다.
 
 ## 7. 커밋·문서 관리
 
-- 작업별 커밋 설명은 **한국어**로 쓴다. 형식은 `<종류>[(<영역>)]: <한국어 설명>`이며 영역은 선택 사항이다. 예: `docs: 문서 수정`, `feat(frontend): 생활 설문 화면 추가`. `docs/common/CONTRIBUTING.md:45-54`.
-- 프론트엔드 PR은 범찬의 리뷰를 거쳐 병합하며, API 계약 변경은 `docs/common/API.md` 수정·승인 후 코드에 반영한다. `docs/common/CONTRIBUTING.md:55-71`.
+- 작업별 커밋 설명은 **한국어**로 쓴다. 형식은 `<종류>[(<영역>)]: <한국어 설명>`이며 영역은 선택 사항이다. 예: `docs: 문서 수정`, `feat(frontend): 생활 설문 화면 추가`. `docs/common/CONTRIBUTING.md#커밋-메시지`.
+- 프론트엔드 변경은 `frontend` push 후 CI 통과 시 `develop`에 자동 병합되며 범찬이 반영 후 리뷰한다. API 계약 변경은 `docs/common/API.md` 수정·승인 후 코드에 반영한다. `docs/common/CONTRIBUTING.md#api-변경-절차`.

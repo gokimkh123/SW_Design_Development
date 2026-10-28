@@ -24,7 +24,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Windows PowerShell (저장소 루트에서, 이 macOS 환경에서는 미검증):
+Windows PowerShell (저장소 루트에서):
 
 ```powershell
 Set-Location frontend
@@ -54,7 +54,7 @@ source .venv/bin/activate
 cp .env.example .env
 ```
 
-Windows PowerShell (저장소 루트에서, 이 macOS 환경에서는 미검증):
+Windows PowerShell (저장소 루트에서):
 
 ```powershell
 Set-Location backend
@@ -63,7 +63,7 @@ py -3 -m venv .venv
 Copy-Item .env.example .env
 ```
 
-`backend/.env`의 API 키는 비공개 채널로 받아야 하며 **커밋하지 않는다**. 현재 저장소에는 FastAPI ASGI 앱, `engine/fake.py`, 확정 설문 · 장면 데이터가 없다(시드 인물은 `data/seed/personas.json` 초안 존재, 백엔드 테스트는 `backend/requirements-dev.txt`로 실행 가능). 따라서 지금은 `pip install`이나 `uvicorn` 실행 명령을 제시할 수 없다. 백엔드 담당자가 의존성 명세와 앱 진입점을 추가한 뒤 **실제 설치·실행 명령을 [docs/backend/README.md](../backend/README.md)에 기록하고 검증**해야 한다.
+로컬 개발은 `ENGINE_IMPL=fake`(가짜 엔진, `backend/app/fake_engine.py`)로 진행하며 API 키가 필요 없다. `.env`는 **커밋하지 않는다**. 현재 저장소에는 FastAPI ASGI 앱(`backend/app/main.py`), 실제 엔진 패키지(`engine/`), 확정 설문 · 장면 데이터가 없다(시드 인물은 `data/seed/personas.json` 초안 존재, 백엔드 테스트는 `backend/requirements-dev.txt`로 실행 가능). 따라서 지금은 `pip install`이나 `uvicorn` 실행 명령을 제시할 수 없다. 백엔드 담당자가 의존성 명세와 앱 진입점을 추가한 뒤 **실제 설치·실행 명령을 [docs/backend/README.md](../backend/README.md)에 기록하고 검증**해야 한다.
 
 구현할 API 응답·SSE·검증 fixture는 [API 명세서](API.md)와 [프론트엔드 ↔ 백엔드 인수인계](../backend/FRONTEND_HANDOFF.md)를 기준으로 합의한다. 엔진·시드가 준비되지 않은 동안에는 실제 시뮬레이션 완료를 주장하지 않는다.
 

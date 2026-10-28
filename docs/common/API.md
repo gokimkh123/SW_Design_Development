@@ -653,7 +653,7 @@ async def rephrase(memo: str, sender: Persona, receiver: Persona) -> Rephrased: 
 | 후보 익명 | 매칭 전 시뮬레이션에서는 백엔드가 후보 페르소나의 `nickname`을 `alias`(예: `후보 A`)로 바꿔 엔진에 전달 |
 | 이벤트 범위 (10/28 확정) | 엔진 `simulate()`는 장면 이벤트(`scene_started` · `utterance` · `scene_judged` · `error`)만 반환. `simulation_started` · `simulation_completed`는 백엔드 시뮬레이션 실행기가 생성 |
 | 의존성 | 엔진의 FastAPI · DB 비의존. 순수 Python + Anthropic SDK |
-| 가짜 엔진 | `engine/fake.py`: 동일 함수명으로 `data/replays/` 결과 반환. 엔진 완성 전 백엔드 개발 및 `replay` 모드 공용 |
+| 가짜 엔진 | `backend/app/fake_engine.py`(`ENGINE_IMPL=fake`): 동일 함수명, LLM 미호출 고정 결과 반환. 엔진 완성 전 백엔드 개발용. `replay` 모드는 엔진과 무관하게 백엔드가 `data/replays/` 재생 |
 | 단독 실행 | `python -m engine.cli simulate --me per_haneul --candidate per_daeun`로 터미널 내 결과 확인 지원 |
 
 ---
@@ -679,7 +679,7 @@ export default defineConfig({
 ### 8.2 mock 기반 선행 개발
 
 - 프론트엔드: 본 문서 JSON 예시 기반 mock 응답으로 화면 선행 개발 (`VITE_USE_MOCK=true`)
-- 백엔드: 엔진 완성 전까지 가짜 엔진 사용. `engine/fake.py` 도착 전에는 백엔드 임시 가짜 엔진(`backend/app/fake_engine.py`, LLM 미호출) 사용
+- 백엔드: 엔진 완성 전까지 가짜 엔진(`backend/app/fake_engine.py`, LLM 미호출, `ENGINE_IMPL=fake`) 사용
 - 백엔드의 엔진 호출은 엔진 어댑터(`backend/app/engine_adapter.py`) 단일 경유
 - 10/28(M1)까지 화면 → API → 가짜 엔진 → DB 한 줄 연결로 통합 문제 조기 발견
 
@@ -687,7 +687,7 @@ export default defineConfig({
 
 | 이름 | 예시 | 설명 |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | (비공개) | 건한으로부터 비공개 수령, 커밋 금지 |
+| `ANTHROPIC_API_KEY` | (비공개) | VM `~/roommate/.env`에만 보관, 팀원 미배포 · 커밋 금지 (로컬은 `ENGINE_IMPL=fake`로 불필요) |
 | `LLM_PROVIDER` | `anthropic` | 타 API 전환 시 변경 |
 | `LLM_MODEL` | `claude-haiku-5-5` | |
 | `LLM_MAX_CONCURRENCY` | `8` | 동시 LLM 요청 수 상한 |

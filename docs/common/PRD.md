@@ -434,7 +434,7 @@ sequenceDiagram
 | 교체 가능성 | `engine/llm.py`의 `LLMClient` 단일 지점 교체로 무료 API 등 타 모델 전환 가능 |
 | 무료 API 미채택 사유 | 무료 API의 낮은 분당 요청 한도. 방문객 1명당 약 300회 호출로 부스 동시 이용 시 차단 위험 큼 |
 | 예상 비용 | 호출 1회 입력 1,200 · 출력 300 토큰 가정 시 방문객 1명(후보 3명 × 20장면) 약 $0.08 ~ 0.10. 방문객 100명 + 개발 테스트 합계 $30 이내 예상 |
-| 키 관리 | 건한 발급 후 팀 내 비공개 공유, 백엔드 `.env`에만 저장, Console 사용 한도 설정 |
+| 키 관리 | 팀원 배포 없음. 실제 키는 VM `~/roommate/.env`에만 저장, 로컬 개발은 가짜 엔진(`ENGINE_IMPL=fake`). 실제 엔진 테스트 시 건한이 사용 한도를 건 개인별 키 발급 후 폐기, Console 사용 한도 설정 |
 
 ### 8.7 안정성과 품질
 
@@ -487,8 +487,8 @@ flowchart LR
 | 백엔드 | Python FastAPI, SQLite | LLM SDK · 비동기 병렬 호출 · SSE 구현 용이, 요청 · 응답 모델 기반 API 문서(`/docs`) 자동 생성 |
 | AI 엔진 | Python, Anthropic Python SDK, Claude Haiku 5.5 | 8.6 참고 |
 | 실시간 | SSE (Server-Sent Events) | 서버 → 클라이언트 단방향 장면 스트리밍에 충분 |
-| 실행 환경 | 발표회는 노트북 로컬 실행 기본. 여유 시 프론트 Vercel · 백엔드 Render 배포 및 QR 접속 | 행사장 네트워크 불안정 시에도 시연 가능 |
-| 협업 | GitHub Pull Request (`frontend` · `backend` → `develop` → `main`) | [협업 가이드](CONTRIBUTING.md) 참고 |
+| 실행 환경 | VM(Docker) 배포 및 QR 접속, 장애 시 노트북 로컬 실행으로 전환 | 행사장 네트워크 불안정 시에도 시연 가능 |
+| 협업 | `frontend` · `backend` push → CI 통과 시 `develop` 자동 병합 → `develop` → `main` PR (건한 승인) | [협업 가이드](CONTRIBUTING.md) 참고 |
 | CI/CD | GitHub Actions: CI(프론트엔드 · 백엔드 검사), CD(`main` → Docker 이미지 → VM 배포) | [VM 배포 안내](DEPLOY.md) 참고 |
 
 ### 10.3 데이터 모델 (초안)
@@ -581,11 +581,11 @@ SW_Design_Development/
 │   ├── app/            #   엔진 어댑터 · 임시 가짜 엔진 (서버 코드 예정)
 │   └── tests/          #   pytest
 ├── engine/             # 시뮬레이션 엔진 (건한)
-│   ├── prompts/        #   페르소나 · 발화 · 판정 · 중재 프롬프트
-│   └── llm.py          #   LLMClient (모델 교체 지점)
+│   ├── prompts/        #   페르소나 · 발화 · 판정 · 중재 프롬프트 (예정)
+│   └── llm.py          #   LLMClient, 모델 교체 지점 (예정)
 └── data/
-    ├── seed/           # 설문 12문항, 장면 20개, 시드 인물 11명
-    └── replays/        # 리플레이용 사전 생성 시뮬레이션
+    ├── seed/           # 시드 인물 11명(초안 완료), 설문 12문항 · 장면 20개 (예정)
+    └── replays/        # 리플레이용 사전 생성 시뮬레이션 (예정)
 ```
 
 ---
@@ -707,7 +707,7 @@ flowchart LR
 
 - 배경: 건한의 PM · AI 엔진 겸임에 따른 업무 분산 필요
 - 문서 · 일정 · GitHub 구성은 개발 착수 전(10/19) 완료, 포스터는 10/26까지 마무리
-- 개발 기간(10/27 ~ 11/1)에는 엔진 개발 집중, 기능 테스트는 각자 PR 단계에서 수행
+- 개발 기간(10/27 ~ 11/1)에는 엔진 개발 집중, 기능 테스트는 각자 push 시 CI 및 `develop` 반영 후 확인
 - 시드 데이터 입력 및 리플레이 데이터 점검은 범찬 지원
 - 엔진 연결(10/30)은 범찬과 페어 진행
 
