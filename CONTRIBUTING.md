@@ -17,21 +17,44 @@
 ```mermaid
 gitGraph
     commit id: "main"
+    branch develop
+    checkout develop
     branch feat/persona-card
     checkout feat/persona-card
     commit id: "카드 UI"
     commit id: "API 연동"
+    checkout develop
+    merge feat/persona-card id: "Squash merge (CI)"
     checkout main
-    merge feat/persona-card id: "Squash merge"
-    commit id: "다음 작업"
+    merge develop id: "Merge commit (CD)"
 ```
 
+| 브랜치 | 역할 | 병합 방식 | 자동화 |
+| --- | --- | --- | --- |
+| 작업 브랜치 (`feat/` 등) | 개인 작업 | → `develop` **Squash and merge** | push마다 CI |
+| `develop` | 통합 · 검증 (기본 작업 기준) | → `main` **Create a merge commit** | CI |
+| `main` | 배포 · 발표회 버전 | — | CD (GitHub Pages 배포) |
+
 1. **할 일 확인** — [일정 문서](docs/SCHEDULE.md)의 날짜별 할 일 표 내 당일 담당 칸 확인
-2. **브랜치** — `main`에서 `종류/짧은-설명` 형식으로 분기 (예: `feat/persona-card`)
+2. **브랜치** — 최신 `develop`에서 `종류/짧은-설명` 형식으로 분기 (예: `feat/persona-card`)
 3. **커밋** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋
-4. **PR** — PR 템플릿에 작업 내용 및 확인 방법 기재
-5. **리뷰** — 리뷰 짝 1명 승인 후 **Squash and merge**, 브랜치 삭제
-6. **`main` 상시 실행 가능 상태 유지** — 오류 코드 병합 금지, 발표회 버전은 `main`에서 직접 실행
+4. **PR** — base를 **`develop`** 으로 지정, PR 템플릿에 작업 내용 및 확인 방법 기재
+5. **리뷰** — CI 통과 및 리뷰 짝 1명 승인 후 **Squash and merge**, 브랜치 삭제
+6. **`main` 반영** — PM이 `develop` → `main` PR 생성 후 병합 (작업 브랜치 → `main` 직접 PR 금지)
+7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드 병합 금지, 발표회 버전은 `main`에서 실행
+
+## CI/CD
+
+| 워크플로 | 실행 시점 | 내용 |
+| --- | --- | --- |
+| [CI](.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) |
+| [main guard](.github/workflows/main-guard.yml) | `main` 대상 PR | 출발 브랜치가 `develop`이 아니면 실패 |
+| [CD](.github/workflows/cd.yml) | `main` push | 프론트엔드 목업 빌드(`VITE_USE_MOCK=true`) → GitHub Pages 배포 |
+
+- CI 결과: PR 하단 Checks 또는 저장소 **Actions** 탭에서 확인, 실패 시 로그 확인 후 같은 브랜치에 수정 커밋 push
+- push 전 로컬 확인 권장: `frontend/`에서 `npm run typecheck && npm test`, `backend/`에서 `python -m pytest`
+- API 키 미사용: CI는 가짜 엔진(`ENGINE_IMPL=fake`), CD는 목업 모드로만 실행
+- 백엔드 배포: 서버 미확정으로 보류, 발표회 시연은 로컬 실행([로컬 실행 안내](docs/LOCAL_DEVELOPMENT.md))
 
 ## 브랜치 이름
 
@@ -74,7 +97,7 @@ gitGraph
 ## 문서 문체
 
 - 브랜치 작업 중에는 자유롭게 작성
-- `main` 병합 전 문어체(`~한다`) 또는 개조식(명사형 종결)으로 정리, 구어체(`~해요` · `~합니다`) 금지
+- `develop` → `main` 병합 전 문어체(`~한다`) 또는 개조식(명사형 종결)으로 정리, 구어체(`~해요` · `~합니다`) 금지
 - 예외: 앱 화면 노출 문구(설문 문항, 한 줄 판정 등)
 
 ## 버그 처리
