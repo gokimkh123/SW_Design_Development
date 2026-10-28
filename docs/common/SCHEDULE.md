@@ -26,7 +26,7 @@
 
 - 굵은 세로선: 포스터 제출(10/26) · 기능 동결(11/1)
 - 회색 배경: 중간고사 기간
-- 일정 변경 시 [`docs/scripts/gantt.py`](scripts/gantt.py)의 작업 목록 수정 후 재실행하여 이미지 갱신
+- 일정 변경 시 [`docs/common/scripts/gantt.py`](scripts/gantt.py)의 작업 목록 수정 후 재실행하여 이미지 갱신
 
 ## 마일스톤
 

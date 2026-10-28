@@ -1,6 +1,6 @@
 """엔진 어댑터.
 
-- 백엔드에서 엔진을 부르는 유일한 통로 (docs/API.md 7장 함수만 노출)
+- 백엔드에서 엔진을 부르는 유일한 통로 (docs/common/API.md 7장 함수만 노출)
 - 엔진 선택: 환경변수 ENGINE_IMPL = fake(기본, app.fake_engine) | real(engine 패키지)
 - 입력: 백엔드 dict → 엔진 Pydantic 모델(engine.models 가 있을 때만)
 - 출력: 엔진 모델 → JSON 직렬화 가능한 dict

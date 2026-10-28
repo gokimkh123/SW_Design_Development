@@ -1,0 +1,48 @@
+# frontend · backend CI 통과 시 develop 자동 병합 → develop CI 실행
+# 충돌 시 실패 처리: 해당 브랜치에서 git pull origin develop 후 충돌 해결 · push
+name: auto merge to develop
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [frontend, backend]
+
+concurrency:
+  group: auto-merge-develop
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  merge:
+    name: merge into develop
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: develop 병합
+        id: merge
+        run: |
+          set +e
+          out=$(gh api -i -X POST "repos/$REPO/merges" \
+            -f base=develop -f head="$SHA" \
+            -f commit_message="chore: $BRANCH → develop 자동 병합 (CI 통과 ${SHA:0:7})" 2>&1)
+          status=$(printf '%s\n' "$out" | head -1 | awk '{print $2}')
+          case "$status" in
+            201) echo "$BRANCH(${SHA:0:7}) → develop 병합 완료"; echo "merged=true" >> "$GITHUB_OUTPUT" ;;
+            204) echo "develop에 이미 반영된 커밋 (병합 생략)" ;;
+            409) echo "::error::$BRANCH와 develop 충돌 → $BRANCH에서 'git pull origin develop' 후 충돌 해결 · push"; exit 1 ;;
+            *) printf '%s\n' "$out" | tail -5; exit 1 ;;
+          esac
+
+      # GITHUB_TOKEN으로 만든 push는 CI를 자동 실행하지 않으므로 직접 실행
+      - name: develop CI 실행
+        if: steps.merge.outputs.merged == 'true'
+        run: gh workflow run ci.yml --ref develop -R "$REPO"

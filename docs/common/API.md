@@ -696,4 +696,4 @@ export default defineConfig({
 | `REPLAY_DELAY_MS` | `600` | 리플레이 발화 간격 |
 | `DATABASE_URL` | `sqlite:///./roommate.db` | |
 
-예시 파일: [`backend/.env.example`](../backend/.env.example)
+예시 파일: [`backend/.env.example`](../../backend/.env.example)

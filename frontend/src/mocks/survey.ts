@@ -1,8 +1,8 @@
 import type { Survey } from '../api/types';
 
 /**
- * 임시 화면 검증용 fixture. q01/q02/q09는 docs/API.md 4.3 예시,
- * 나머지 질문/라벨은 docs/PRD.md 부록 A 초안에서 옮겼으며 option value는
+ * 임시 화면 검증용 fixture. q01/q02/q09는 docs/common/API.md 4.3 예시,
+ * 나머지 질문/라벨은 docs/common/PRD.md 부록 A 초안에서 옮겼으며 option value는
  * 실제 data/seed/survey.json 승인 전까지 확정 계약이 아니다.
  */
 export const provisionalSurvey: Survey = {
