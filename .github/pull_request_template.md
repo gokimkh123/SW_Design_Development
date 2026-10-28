@@ -1,4 +1,4 @@
-<!-- base 브랜치: develop (main 직접 PR 금지) -->
+<!-- base 브랜치: develop (frontend · backend → develop, main 직접 PR 금지) -->
 
 ## 작업
 

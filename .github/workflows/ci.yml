@@ -1,4 +1,4 @@
-# CI: 작업 브랜치 · develop push 시 프론트엔드 · 백엔드 검사
+# CI: frontend · backend · develop 등 main 외 브랜치 push 시 프론트엔드 · 백엔드 검사
 # main은 CD 전용(cd.yml)이므로 제외
 name: CI
 

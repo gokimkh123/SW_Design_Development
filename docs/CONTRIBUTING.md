@@ -19,28 +19,37 @@ gitGraph
     commit id: "main"
     branch develop
     checkout develop
-    branch feat/persona-card
-    checkout feat/persona-card
-    commit id: "카드 UI"
-    commit id: "API 연동"
+    branch frontend
+    checkout frontend
+    commit id: "화면 구현"
     checkout develop
-    merge feat/persona-card id: "Squash merge (CI)"
+    branch backend
+    checkout backend
+    commit id: "API 구현"
+    checkout develop
+    merge frontend id: "PR (CI)"
+    merge backend id: "PR (CI) "
     checkout main
-    merge develop id: "Merge commit (CD)"
+    merge develop id: "PR (CD)"
 ```
 
-| 브랜치 | 역할 | 병합 방식 | 자동화 |
-| --- | --- | --- | --- |
-| 작업 브랜치 (`feat/` 등) | 개인 작업 | → `develop` **Squash and merge** | push마다 CI |
-| `develop` | 통합 · 검증 (기본 작업 기준) | → `main` **Create a merge commit** | CI |
-| `main` | 배포 · 발표회 버전 | — | CD (Docker 이미지 → VM 배포) |
+| 브랜치 | 담당 | 역할 | 병합 대상 · 방식 | 자동화 |
+| --- | --- | --- | --- | --- |
+| `frontend` | 동현 | 프론트엔드 작업 (장기 유지) | → `develop` **Create a merge commit** | push마다 CI |
+| `backend` | 일준 · 범찬 | 백엔드 작업 (장기 유지) | → `develop` **Create a merge commit** | push마다 CI |
+| `develop` | 건한 | 통합 · 검증 | → `main` **Create a merge commit** | CI |
+| `main` | 건한 | 배포 · 발표회 버전 | — | CD (Docker 이미지 → VM 배포) |
+
+- `frontend` · `backend`는 병합 후에도 삭제하지 않음 (Squash 병합 금지: 장기 브랜치 이력 충돌 방지)
+- 문서 · 엔진 · 데이터(건한): 단기 브랜치(`docs/…` 등) → `develop` Squash 병합 후 브랜치 삭제
+- 담당 브랜치 내 단기 브랜치(`feat/…`) 사용은 선택 사항: 분기 · 병합 대상은 `frontend` 또는 `backend`
 
 1. **할 일 확인** — [일정 문서](SCHEDULE.md)의 날짜별 할 일 표 내 당일 담당 칸 확인
-2. **브랜치** — 최신 `develop`에서 `종류/짧은-설명` 형식으로 분기 (예: `feat/persona-card`)
-3. **커밋** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋
-4. **PR** — base를 **`develop`** 으로 지정, PR 템플릿에 작업 내용 및 확인 방법 기재
-5. **리뷰** — CI 통과 및 리뷰 짝 1명 승인 후 **Squash and merge**, 브랜치 삭제
-6. **`main` 반영** — PM이 `develop` → `main` PR 생성 후 병합 (작업 브랜치 → `main` 직접 PR 금지)
+2. **최신화** — 작업 전 담당 브랜치에서 `git pull` 후 `git pull origin develop`으로 다른 영역 변경 반영
+3. **커밋 · push** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋 · push (push마다 CI 실행)
+4. **PR** — 기능 단위 완료 시 `frontend` 또는 `backend` → **`develop`** PR 생성, PR 템플릿에 작업 내용 및 확인 방법 기재
+5. **리뷰** — CI 통과 및 리뷰 짝 1명 승인 후 **Create a merge commit** (브랜치 삭제 금지)
+6. **`main` 반영** — 건한이 `develop` → `main` PR 생성 후 병합 (`frontend` · `backend` → `main` 직접 PR 금지)
 7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드 병합 금지, 발표회 버전은 `main`에서 실행
 
 ## CI/CD
@@ -64,6 +73,8 @@ gitGraph
 | `fix/` | 버그 수정 | `fix/report-score-null` |
 | `docs/` | 문서 | `docs/api-review` |
 | `chore/` | 설정 · 빌드 · 데이터 | `chore/seed-personas` |
+
+- 장기 브랜치 `frontend` · `backend` 외 단기 브랜치에만 적용
 
 ## 커밋 메시지
 
