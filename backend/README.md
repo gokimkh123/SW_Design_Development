@@ -7,12 +7,12 @@
 
 - Python, FastAPI, SQLite, SSE
 
-## 분담 (제안 · 일준 · 범찬 협의)
+## 분담 (10/28 일준 · 범찬 협의로 변경)
 
-| 담당 | 담당 업무 | API |
+| 담당 | 담당 업무 | API · 모듈 |
 | --- | --- | --- |
-| 일준 | 서버 세팅 · 공통 규칙, 사용자 · 설문 · 페르소나, 시뮬레이션 · SSE, 엔진 연결, 실행 환경 | `/health` `/users` `/survey` `/personas` `/simulations` |
-| 범찬 | DB 스키마 · 시드 로더, 시드 후보 10명, 후보 추림, 리포트, 매칭 · 생활 규칙 | `/candidates` `/report` `/matches` `/rules` |
+| 일준 | API 서버(서버 세팅 · 공통 규칙), DB, 사용자 · 설문 · 페르소나, 후보 추림, 시뮬레이션 API · SSE, 실행 환경 | `/health` `/users` `/survey` `/personas` `/candidates` `/simulations` |
+| 범찬 | 리포트, 매칭 · 생활 규칙 로직, 시드 데이터(시드 인물 11명), 엔진 연결(엔진 어댑터 · 시뮬레이션 실행기) | `/report` `/matches` `/rules` (P1 `/proposals`), `app/engine_adapter.py` |
 
 ## 준수 사항
 
