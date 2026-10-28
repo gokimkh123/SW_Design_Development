@@ -1,4 +1,4 @@
-# engine
+# 엔진 설계 (`engine/`)
 
 - AI 시뮬레이션 엔진
 - **담당: 건한**
@@ -13,13 +13,12 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `llm.py` | `LLMClient` — Claude Haiku 5.5 호출, 모델 교체 지점 |
-| `persona.py` | 5개 축 계산(규칙 기반) + 유형명 · 요약 생성 |
-| `simulate.py` | 진행자 · 에이전트 대화 루프 · 판정자 (`agents` · `single` 모드) |
-| `rules.py` | 점수, 한 줄 판정, 생활 규칙 초안 |
-| `fake.py` | 가짜 엔진 — `data/replays/` 재생 (백엔드 개발 · `replay` 모드) |
-| `cli.py` | 터미널 단독 실행 · 리플레이 데이터 생성 |
-| `prompts/` | 페르소나 · 발화 · 판정 · 중재 프롬프트 |
+| `engine/llm.py` | `LLMClient` — Claude Haiku 5.5 호출, 모델 교체 지점 |
+| `engine/persona.py` | 5개 축 계산(규칙 기반) + 유형명 · 요약 생성 |
+| `engine/simulate.py` | 진행자 · 에이전트 대화 루프 · 판정자 (`agents` · `single` 모드) |
+| `engine/rules.py` | 점수, 한 줄 판정, 생활 규칙 초안 |
+| `engine/cli.py` | 터미널 단독 실행 · 리플레이 데이터 생성 |
+| `engine/prompts/` | 페르소나 · 발화 · 판정 · 중재 프롬프트 |
 
 ## LLM
 

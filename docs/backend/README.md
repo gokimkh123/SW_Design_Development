@@ -1,4 +1,4 @@
-# backend
+# 백엔드 안내 (`backend/`)
 
 - FastAPI 서버
 - **담당: 일준 · 범찬**

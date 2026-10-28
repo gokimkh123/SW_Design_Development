@@ -60,7 +60,7 @@ P2의 실제 데이터·권한 정책은 [PRD FR-A6](../common/PRD.md#71-흐름-
 | --- | --- | --- |
 | 설문·시드·장면 | `data/seed/survey.json` · 20장면 확정 파일 없음. 시드 인물 11명은 `data/seed/personas.json` 초안(#33). API 예시는 설문 3문항 발췌뿐 | 건한: q01–q12 문구·`value`, 후보 10명·리플레이 3건, 장면 20개 확정. 일준: 실제 `GET /survey` 반영 |
 | SSE 사용자 식별 | 공통 `X-User-Id` 필수 vs `EventSource` 예시에는 헤더 없음. 프론트엔드는 현재 fetch 스트림에서 헤더를 보냄 | 일준: SSE 인증·재연결 시 `Last-Event-ID` 계약 확정 |
-| 시뮬레이션 `mode` | 공통 값 `agents/single/replay` vs POST 예시 `live/replay`. 현재 프론트엔드는 POST 예시 기준 | 일준·건한: 요청값/응답값과 서버 내부 모드 분리 확정 |
+| 시뮬레이션 `mode` | (10/28 확정) 요청 · 응답 값은 `live` · `replay`, `live` 실행 방식은 서버 `SIM_MODE`(`agents` · `single`)로 결정 ([API 명세서 7장](../common/API.md#7-엔진-인터페이스)). 프론트엔드 현행 구현과 일치 | 조치 불필요 |
 | 후보 시작 시점 | PRD의 3명 병렬 자동 실행 vs API 예시의 후보별 POST. 현재 프론트엔드는 후보 선택 시 시작 | 일준·범찬·동현: 자동 시작 여부·동시 요청 수·idempotency 확정 |
 | P1/P2 미정 항목 | 월 예상 갈등 산식, D2 실제 전송, C3 거절/재제안·시험 기간 자동 적용, A4 축 직접 수정, D1/D3 API, D4 권한 | 건한(제품/산식), 일준·범찬(계약/권한), 동현(UI 상태) 공동 합의 |
 

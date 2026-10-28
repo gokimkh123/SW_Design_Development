@@ -1,4 +1,4 @@
-<!-- base 브랜치: develop (frontend · backend → develop, main 직접 PR 금지) -->
+<!-- base 브랜치: develop. 사용 대상: 건한의 문서 · 엔진 · 데이터 PR, 보호 경로 변경 PR, develop → main 반영 PR (frontend · backend 일반 작업은 push 시 자동 병합) -->
 
 ## 작업
 
