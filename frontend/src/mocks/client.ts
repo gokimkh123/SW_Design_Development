@@ -74,7 +74,6 @@ const ruleTexts = [
   '칸 나누기 · 공용 칸 주 1회 정리', '밤 23도 · 외출 시 끄기', '휴지·세제 번갈아 구매 · 앱 정산',
 ];
 const ruleScenes = [4, 7, 16, 14, 6, 11];
-const scoreByCandidate: Record<string, number> = { per_daeun: 88, per_jiho: 84, per_subin: 71 };
 const candidateAxes: Record<string, Axes> = {
   per_daeun: { sleep_rhythm: 25, noise_sensitivity: 67, cleanliness: 100, sociability: 33, sharing_tolerance: 33 },
   per_jiho: { sleep_rhythm: 50, noise_sensitivity: 67, cleanliness: 67, sociability: 0, sharing_tolerance: 0 },
@@ -107,9 +106,25 @@ function sceneFor(index: number, alias: string): Scene {
 
 function verdictFor(index: number, candidateId: string): Verdict {
   if (index === 14) return 'conflict';
+  if (candidateId === 'per_subin' && index === 9) return 'conflict';
   if ([6, 7, 16].includes(index)) return 'negotiated';
-  if (candidateId !== 'per_daeun' && index % 5 === 0) return 'negotiated';
+  if (candidateId === 'per_jiho' && index % 10 === 0) return 'negotiated';
+  if (candidateId === 'per_subin' && index % 5 === 0) return 'negotiated';
   return 'harmonious';
+}
+
+/** PRD 8.5: 궁합 점수 = 사사오입(100 × (원만 + 0.5 × 조율) / 판정된 장면 수) */
+function scoreFor(candidateId: string): number {
+  const c = countsFor(candidateId);
+  return Math.floor((100 * (c.harmonious + 0.5 * c.negotiated)) / (20 - c.pending) + 0.5);
+}
+
+/** PRD 8.5 한 줄 판정 표 */
+function headlineFor(score: number): string {
+  if (score >= 85) return '함께 살기 무난한 조합이에요';
+  if (score >= 70) return '몇 가지만 맞추면 잘 지낼 수 있어요';
+  if (score >= 50) return '미리 규칙을 꼭 정해 두는 게 좋아요';
+  return '생활 방식 차이가 커요';
 }
 
 function countsFor(candidateId: string) {
@@ -128,8 +143,8 @@ function makeReport(simulation: Simulation): Report {
   return {
     simulation_id: simulation.simulation_id,
     candidate: { candidate_id: candidate.candidate_id, alias: candidate.alias, type_name: candidate.type_name },
-    score: simulation.score ?? scoreByCandidate[simulation.candidate_id],
-    headline: simulation.candidate_id === 'per_daeun' ? '함께 살기 무난한 조합이에요' : '대화하며 맞춰 갈 수 있어요',
+    score: simulation.score ?? scoreFor(simulation.candidate_id),
+    headline: headlineFor(simulation.score ?? scoreFor(simulation.candidate_id)),
     verdict_counts: countsFor(simulation.candidate_id),
     scene_verdicts,
     highlights: [14, 6, 7, 16].map((index) => ({
@@ -183,7 +198,7 @@ function mockEvents(simulation: Simulation): SimulationEvent[] {
     } });
   }
   events.push({ id: '20-4', type: 'simulation_completed', data: {
-    score: scoreByCandidate[simulation.candidate_id], headline: '함께 살기 무난한 조합이에요',
+    score: scoreFor(simulation.candidate_id), headline: headlineFor(scoreFor(simulation.candidate_id)),
     verdict_counts: countsFor(simulation.candidate_id),
   } });
   return events;

@@ -126,6 +126,22 @@ def test_simulate_rejects_unknown_event_type():
     assert info.value.code == "INTERNAL_ERROR"
 
 
+def test_simulate_rejects_backend_owned_events():
+    with pytest.raises(EngineError) as info:
+        _drain(EngineAdapter(_stream([{"type": "simulation_completed", "data": {"score": 88}}])))
+    assert info.value.code == "INTERNAL_ERROR"
+
+
+def test_resolve_mode_maps_live_to_sim_mode(monkeypatch):
+    monkeypatch.setenv("SIM_MODE", "single")
+    assert engine_adapter.resolve_mode("live") == "single"
+    monkeypatch.delenv("SIM_MODE")
+    assert engine_adapter.resolve_mode("live") == "agents"
+    assert engine_adapter.resolve_mode("agents") == "agents"
+    with pytest.raises(EngineError):
+        engine_adapter.resolve_mode("replay")
+
+
 def test_simulate_maps_llm_error_mid_stream():
     async def simulate(me, candidate, *, mode):
         yield {"type": "scene_started", "data": {"scene_index": 1, "scene": {}}}

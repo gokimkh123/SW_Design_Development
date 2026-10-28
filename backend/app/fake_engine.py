@@ -247,7 +247,7 @@ async def simulate(me: dict, candidate: dict, *, mode: str = "agents") -> AsyncI
                 "scene_index": index,
                 "verdict": verdict,
                 "reason": _VERDICT_REASONS[verdict],
-                "agreement": agreement if settled else None,
+                "agreement": agreement,  # 충돌 장면도 판정자의 합의안 제시 (PRD 5장 판정 정의)
                 "rule_candidate": {"area": scene["rule_area"], "text": rule_text},
                 "unresolved": None if settled else f"{scene['title']} 기준 차이",
                 "progress": {"done": index, "total": total},

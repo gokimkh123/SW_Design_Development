@@ -63,7 +63,7 @@ py -3 -m venv .venv
 Copy-Item .env.example .env
 ```
 
-`backend/.env`의 API 키는 비공개 채널로 받아야 하며 **커밋하지 않는다**. 현재 저장소에는 `backend/requirements.txt`/`pyproject.toml`, FastAPI ASGI 앱, `engine/fake.py`, 확정 시드 데이터가 없다. 따라서 지금은 `pip install`이나 `uvicorn` 실행 명령을 제시할 수 없다. 백엔드 담당자가 의존성 명세와 앱 진입점을 추가한 뒤 **실제 설치·실행 명령을 [backend/README.md](../backend/README.md)에 기록하고 검증**해야 한다.
+`backend/.env`의 API 키는 비공개 채널로 받아야 하며 **커밋하지 않는다**. 현재 저장소에는 FastAPI ASGI 앱, `engine/fake.py`, 확정 설문 · 장면 데이터가 없다(시드 인물은 `data/seed/personas.json` 초안 존재, 백엔드 테스트는 `backend/requirements-dev.txt`로 실행 가능). 따라서 지금은 `pip install`이나 `uvicorn` 실행 명령을 제시할 수 없다. 백엔드 담당자가 의존성 명세와 앱 진입점을 추가한 뒤 **실제 설치·실행 명령을 [backend/README.md](../backend/README.md)에 기록하고 검증**해야 한다.
 
 구현할 API 응답·SSE·검증 fixture는 [API 명세서](API.md)와 [프론트엔드 ↔ 백엔드 인수인계](FRONTEND_BACKEND_HANDOFF.md)를 기준으로 합의한다. 엔진·시드가 준비되지 않은 동안에는 실제 시뮬레이션 완료를 주장하지 않는다.
 

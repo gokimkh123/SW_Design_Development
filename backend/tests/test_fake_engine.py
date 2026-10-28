@@ -113,6 +113,7 @@ def test_simulate_event_shapes_match_api_section5():
     s09 = next(e["data"] for e in events if e["type"] == "scene_started" and e["data"]["scene"]["scene_id"] == "S09")
     assert "후보 C" in s09["scene"]["situation"] and "{" not in s09["scene"]["situation"]
     assert judged[8]["verdict"] == "conflict"
+    assert judged[8]["agreement"] and judged[8]["unresolved"]  # 충돌도 합의안 제시, 미해결 항목 유지
 
 
 def test_draft_rules_one_per_area_with_most_severe_source():

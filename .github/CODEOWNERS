@@ -1,9 +1,8 @@
 # 폴더별 기본 리뷰어 지정 (PR 생성 시 해당 폴더 담당자에게 리뷰 요청 자동 발송)
-# 팀원 GitHub 아이디 확보 후 아래 주석 해제 및 아이디 기입
+# 건한 @gokimkh123 · 동현 @gymdong · 일준 @Y-IlJun · 범찬 @02chan
 
 /docs/      @gokimkh123
-/engine/    @gokimkh123
-/data/      @gokimkh123
-
-# /frontend/  @동현-아이디
-# /backend/   @일준-아이디 @범찬-아이디
+/engine/    @gokimkh123 @02chan
+/data/      @gokimkh123 @02chan
+/frontend/  @gymdong
+/backend/   @Y-IlJun @02chan

@@ -40,7 +40,7 @@
 | 판정 `verdict` | `harmonious` 원만 · `negotiated` 조율 · `conflict` 충돌 · `pending` 판정 보류 |
 | 대화 방식 `conflict_style` | `direct` 직설 · `avoid` 회피 · `delay` 지연 |
 | 규칙 영역 `area` | `quiet_hours` 조용한 시간 · `guests` 친구 초대 · `cleaning` 청소 · `fridge` 냉장고 · `climate` 냉난방 · `supplies` 공용품 |
-| 시뮬레이션 모드 `mode` | `agents` 기본 · `single` 장면 일괄 생성 · `replay` 사전 생성 결과 재생 |
+| 시뮬레이션 모드 `mode` | 요청 · 응답 값: `live` 실제 실행(기본) · `replay` 사전 생성 결과 재생. `live`의 실행 방식(`agents` · `single`)은 서버 환경변수 `SIM_MODE`로 결정 |
 | 시뮬레이션 상태 `status` | `queued` · `running` · `completed` · `failed` |
 
 ---
@@ -150,7 +150,7 @@ sequenceDiagram
   "department": "간호학과",
   "year": 1,
   "type_name": "깔끔한 집순이",
-  "pre_score": 86,
+  "pre_score": 91,
   "highlight": "청결 기준 비슷",
   "simulation": {
     "simulation_id": "sim_7k2m9q1a",
@@ -549,7 +549,7 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 | `utterance` | 발화 1개 | `{ scene_index, turn, speaker, name, text }` |
 | `scene_judged` | 장면 판정 | `{ scene_index, verdict, reason, agreement, rule_candidate, unresolved, progress: { done, total } }` |
 | `simulation_completed` | 20장면 종료 | `{ score, headline, verdict_counts }` |
-| `error` | 오류 | `{ code, message, scene_index, retryable }` |
+| `error` | 오류 | `{ code, message, scene_index, retryable }` (`scene_index`: 장면 무관 오류면 `null`) |
 
 ### 5.2 예시
 
@@ -570,23 +570,22 @@ data: {"scene_index":9,"verdict":"negotiated","reason":"소음 기준 차이가 
 ### 5.3 규칙
 
 - 이벤트 `id`: `{scene_index}-{순번}`, 시작 이벤트는 `0-0`
-- 서버의 전 이벤트 DB 저장. 재연결 시 브라우저가 보내는 `Last-Event-ID` 이후부터 재전송, 헤더 부재 시 처음부터 전송. 완료된 시뮬레이션 연결 시에도 전체 이벤트 수신 후 `simulation_completed`로 종료
+- 서버의 전 이벤트 DB 저장. 재연결 시 클라이언트가 보내는 `Last-Event-ID` 헤더 이후부터 재전송, 헤더 부재 시 처음부터 전송. 완료된 시뮬레이션 연결 시에도 전체 이벤트 수신 후 `simulation_completed`로 종료
 - 15초 간격 `: ping` 주석 전송으로 연결 유지
 - `replay` 모드: 동일 이벤트를 `REPLAY_DELAY_MS` 간격으로 전송
 - 장면 판정 실패 시 `scene_judged`의 `verdict`는 `pending`, 다음 장면으로 진행
+- `error` 이벤트 후 서버는 스트림 종료. 클라이언트는 `retryable=true`일 때만 재연결, `false`면 즉시 중단
 
 ### 5.4 프론트엔드 사용 예
 
-```ts
-const es = new EventSource(`/api/simulations/${simulationId}/events`);
+- 브라우저 기본 `EventSource`는 `X-User-Id` 헤더 전송 불가 → `fetch` 스트림으로 구독 (`frontend/src/api/real.ts`의 `subscribeSimulation` 참고)
 
-es.addEventListener("scene_started", (e) => onSceneStarted(JSON.parse(e.data)));
-es.addEventListener("utterance", (e) => onUtterance(JSON.parse(e.data)));
-es.addEventListener("scene_judged", (e) => onSceneJudged(JSON.parse(e.data)));
-es.addEventListener("simulation_completed", (e) => {
-  onCompleted(JSON.parse(e.data));
-  es.close();
+```ts
+const res = await fetch(`/api/simulations/${simulationId}/events`, {
+  headers: { Accept: "text/event-stream", "X-User-Id": userId, ...(lastId ? { "Last-Event-ID": lastId } : {}) },
 });
+const reader = res.body!.getReader();
+// 빈 줄("\n\n") 단위로 이벤트 블록을 나눈 뒤 id · event · data 필드를 파싱하여 처리
 ```
 
 - 재연결 시 동일 `id` 이벤트 중복 수신 가능 → 화면 반영 전 `id` 기준 중복 제거
@@ -603,7 +602,7 @@ es.addEventListener("simulation_completed", (e) => {
 | --- | --- | --- |
 | 400 | `SURVEY_INCOMPLETE` | 12문항 중 응답 누락 |
 | 401 | `USER_REQUIRED` | `X-User-Id` 누락 또는 미등록 사용자 |
-| 404 | `USER_NOT_FOUND` · `PERSONA_NOT_FOUND` · `SIMULATION_NOT_FOUND` · `MATCH_NOT_FOUND` · `RULE_NOT_FOUND` | 대상 없음 |
+| 404 | `USER_NOT_FOUND` · `PERSONA_NOT_FOUND` · `SIMULATION_NOT_FOUND` · `MATCH_NOT_FOUND` · `RULE_NOT_FOUND` · `PROPOSAL_NOT_FOUND` | 대상 없음 |
 | 409 | `SIMULATION_NOT_COMPLETED` | 시뮬레이션 완료 전 리포트 · 매칭 요청 |
 | 422 | `VALIDATION_ERROR` | 형식 오류 (FastAPI 기본 422 응답을 본 형식으로 변환) |
 | 429 | `LLM_RATE_LIMITED` | LLM 분당 한도 초과, 잠시 후 재시도 |
@@ -649,6 +648,9 @@ async def rephrase(memo: str, sender: Persona, receiver: Persona) -> Rephrased: 
 | --- | --- |
 | 모델 | `engine/models.py`의 Pydantic 모델. 필드 이름은 본 문서 3장과 동일 (ID 필드는 백엔드 부여) |
 | 이벤트 | `SimEvent` 형식은 `{ "type": "utterance", "data": {...} }`로 5장 SSE 이벤트와 동일. 백엔드는 수신 이벤트 저장 후 SSE로 그대로 전달 |
+| 판정 모델 `SceneJudgement` | `scene_index` · `scene_id` · `verdict` · `reason` · `agreement` · `rule_candidate` · `unresolved`. `scene_judged` 이벤트 `data`에서 `progress`를 뺀 형태 |
+| 실행 모드 | `simulate(mode=...)`는 `agents` · `single`만 허용. 요청의 `live`는 엔진 어댑터가 `SIM_MODE` 값으로 변환, `replay`는 엔진 호출 없이 백엔드가 처리 |
+| 후보 익명 | 매칭 전 시뮬레이션에서는 백엔드가 후보 페르소나의 `nickname`을 `alias`(예: `후보 A`)로 바꿔 엔진에 전달 |
 | 이벤트 범위 (10/28 확정) | 엔진 `simulate()`는 장면 이벤트(`scene_started` · `utterance` · `scene_judged` · `error`)만 반환. `simulation_started` · `simulation_completed`는 백엔드 시뮬레이션 실행기가 생성 |
 | 의존성 | 엔진의 FastAPI · DB 비의존. 순수 Python + Anthropic SDK |
 | 가짜 엔진 | `engine/fake.py`: 동일 함수명으로 `data/replays/` 결과 반환. 엔진 완성 전 백엔드 개발 및 `replay` 모드 공용 |
@@ -690,7 +692,7 @@ export default defineConfig({
 | `LLM_MODEL` | `claude-haiku-5-5` | |
 | `LLM_MAX_CONCURRENCY` | `8` | 동시 LLM 요청 수 상한 |
 | `ENGINE_IMPL` | `fake` | `fake` 백엔드 임시 가짜 엔진(LLM 미호출, 기본값) · `real` `engine` 패키지 |
-| `SIM_MODE` | `agents` | `agents` · `single` · `replay` |
+| `SIM_MODE` | `agents` | `live` 실행 방식: `agents` · `single` (`replay`는 요청 `mode`로 지정) |
 | `REPLAY_DELAY_MS` | `600` | 리플레이 발화 간격 |
 | `DATABASE_URL` | `sqlite:///./roommate.db` | |
 

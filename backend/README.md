@@ -18,7 +18,7 @@
 
 - 요청 · 응답 형식은 [API 명세서](../docs/API.md) 준수, 변경 필요 시 명세서 PR 선행
 - 실연동에 필요한 데이터·미정 계약·검증 사례는 [프론트엔드 ↔ 백엔드 인수인계](../docs/FRONTEND_BACKEND_HANDOFF.md) 참고 (협의용, 미승인)
-- 엔진은 [API 명세서 7장](../docs/API.md#7-엔진-인터페이스) 함수만 호출, 엔진 완성 전에는 `engine/fake.py`(가짜 엔진) 사용
+- 엔진은 [API 명세서 7장](../docs/API.md#7-엔진-인터페이스) 함수만 호출, 엔진 완성 전에는 임시 가짜 엔진(`app/fake_engine.py`, `ENGINE_IMPL=fake`) 사용
 - 오류 형식 `{ "error": { "code", "message" } }` 통일
 - 환경변수: [`.env.example`](.env.example)을 `backend/.env`로 복사하여 사용, `.env` 커밋 금지
 

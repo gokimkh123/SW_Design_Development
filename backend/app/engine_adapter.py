@@ -18,9 +18,17 @@ from typing import Any, AsyncIterator
 
 from app import fake_engine
 
-EVENT_TYPES = frozenset(
-    {"simulation_started", "scene_started", "utterance", "scene_judged", "simulation_completed", "error"}
-)
+# 엔진은 장면 이벤트만 반환 (API.md 7장 "이벤트 범위"). 시작 · 완료 이벤트는 백엔드 실행기가 생성
+EVENT_TYPES = frozenset({"scene_started", "utterance", "scene_judged", "error"})
+ENGINE_MODES = frozenset({"agents", "single"})
+
+
+def resolve_mode(mode: str | None) -> str:
+    """요청 mode(live) → 엔진 실행 방식(SIM_MODE: agents | single). replay는 엔진을 호출하지 않으므로 거부."""
+    resolved = (os.getenv("SIM_MODE") or "agents").strip().lower() if mode in (None, "live") else mode
+    if resolved not in ENGINE_MODES:
+        raise EngineError("INTERNAL_ERROR", 500, f"엔진 실행 모드가 올바르지 않아요: {resolved!r}")
+    return resolved
 
 # anthropic SDK 를 직접 import 하지 않고 예외 클래스 이름으로 판별 (가짜 엔진 환경에 SDK 미설치 허용)
 _RATE_LIMIT_ERRORS = frozenset({"RateLimitError"})
@@ -100,9 +108,10 @@ class EngineAdapter:
     def load_scenes(self) -> list[dict]:
         return _to_dict(self._call_sync("load_scenes"))
 
-    async def simulate(self, me: dict, candidate: dict, *, mode: str = "agents") -> AsyncIterator[dict]:
+    async def simulate(self, me: dict, candidate: dict, *, mode: str | None = "live") -> AsyncIterator[dict]:
         """이벤트를 {"type", "data"} dict 로 하나씩 반환. 형식이 틀린 이벤트는 INTERNAL_ERROR."""
-        stream = self._impl.simulate(self._model("Persona", me), self._model("Persona", candidate), mode=mode)
+        engine_mode = resolve_mode(mode)
+        stream = self._impl.simulate(self._model("Persona", me), self._model("Persona", candidate), mode=engine_mode)
         try:
             async for raw in stream:
                 event = _to_dict(raw)
