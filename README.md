@@ -173,7 +173,7 @@ flowchart LR
 | 프론트엔드 | React · TypeScript · Vite · Tailwind CSS |
 | 백엔드 | Python · FastAPI · SQLite · SSE |
 | AI 엔진 | Claude API (Haiku 5.5), 모델 교체 가능 구조 |
-| CI/CD | GitHub Actions, Docker (GHCR) → VM 배포 ([배포 안내](deploy/README.md)) |
+| CI/CD | GitHub Actions, Docker (GHCR) → VM 배포 ([배포 안내](docs/DEPLOY.md)) |
 
 ---
 
@@ -182,13 +182,14 @@ flowchart LR
 | 문서 | 내용 |
 | --- | --- |
 | [PRD](docs/PRD.md) | 요구사항, 범위, 시뮬레이션 엔진 설계, 발표회 운영, 역할 |
-| [프론트엔드 P0 구현 계획](frontend/FRONTEND_PLAN.md) | 필수 9개 화면의 작업 순서, API 연동, 검증 기준 |
+| [프론트엔드 P0 구현 계획](docs/frontend/PLAN.md) | 필수 9개 화면의 작업 순서, API 연동, 검증 기준 |
 | [API 명세서](docs/API.md) | 엔드포인트 21개, 데이터 모델, SSE 이벤트, 엔진 인터페이스 |
 | [로컬 개발 실행 가이드](docs/LOCAL_DEVELOPMENT.md) | 팀원별 clone·프론트엔드 실행·백엔드 준비 및 실연동 절차 |
-| [프론트엔드 ↔ 백엔드 인수인계](docs/FRONTEND_BACKEND_HANDOFF.md) | 실연동 데이터·미정 계약·검증 사례 (협의용) |
+| [프론트엔드 ↔ 백엔드 인수인계](docs/backend/FRONTEND_HANDOFF.md) | 실연동 데이터·미정 계약·검증 사례 (협의용) |
 | [일정 · 간트 차트](docs/SCHEDULE.md) | 사람별 간트 차트, 마일스톤, 날짜별 할 일 |
-| [협업 가이드](CONTRIBUTING.md) | 브랜치 · 커밋 · PR · 리뷰 규칙, CI/CD |
-| [서비스 기획서 v1.0 (PDF)](룸메궁합_서비스기획서_v1.0.pdf) | 제안 배경, 화면 설계, 수익 모델, 사업 확장 방안 |
+| [협업 가이드](docs/CONTRIBUTING.md) | 브랜치 · 커밋 · PR · 리뷰 규칙, CI/CD, 비밀 정보 관리 |
+| [VM 배포 안내](docs/DEPLOY.md) | Docker 이미지 · VM 준비 · 배포 Secrets · 운영 명령 |
+| [서비스 기획서 v1.0 (PDF)](docs/룸메궁합_서비스기획서_v1.0.pdf) | 제안 배경, 화면 설계, 수익 모델, 사업 확장 방안 |
 
 ## 라이선스
 

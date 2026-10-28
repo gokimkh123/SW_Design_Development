@@ -7,10 +7,10 @@
 
 | 이름 | 역할 | 담당 폴더 | 주요 참고 문서 |
 | --- | --- | --- | --- |
-| 건한 | PM · 기획 · QA, AI 시뮬레이션 엔진 | `docs/` `engine/` `data/` | [PRD](docs/PRD.md) · [일정](docs/SCHEDULE.md) |
-| 동현 | 프론트엔드 | `frontend/` | [API 명세서](docs/API.md) 1~5장 |
-| 일준 | 백엔드 | `backend/` | [API 명세서](docs/API.md) 전체 |
-| 범찬 | 백엔드 · 데이터 | `backend/` `data/seed/` | [API 명세서](docs/API.md) 전체 |
+| 건한 | PM · 기획 · QA, AI 시뮬레이션 엔진 | `docs/` `engine/` `data/` | [PRD](PRD.md) · [일정](SCHEDULE.md) |
+| 동현 | 프론트엔드 | `frontend/` | [API 명세서](API.md) 1~5장 |
+| 일준 | 백엔드 | `backend/` | [API 명세서](API.md) 전체 |
+| 범찬 | 백엔드 · 데이터 | `backend/` `data/seed/` | [API 명세서](API.md) 전체 |
 
 ## 작업 흐름
 
@@ -35,7 +35,7 @@ gitGraph
 | `develop` | 통합 · 검증 (기본 작업 기준) | → `main` **Create a merge commit** | CI |
 | `main` | 배포 · 발표회 버전 | — | CD (Docker 이미지 → VM 배포) |
 
-1. **할 일 확인** — [일정 문서](docs/SCHEDULE.md)의 날짜별 할 일 표 내 당일 담당 칸 확인
+1. **할 일 확인** — [일정 문서](SCHEDULE.md)의 날짜별 할 일 표 내 당일 담당 칸 확인
 2. **브랜치** — 최신 `develop`에서 `종류/짧은-설명` 형식으로 분기 (예: `feat/persona-card`)
 3. **커밋** — 아래 커밋 규칙 준수, 작은 단위로 수시 커밋
 4. **PR** — base를 **`develop`** 으로 지정, PR 템플릿에 작업 내용 및 확인 방법 기재
@@ -47,9 +47,9 @@ gitGraph
 
 | 워크플로 | 실행 시점 | 내용 |
 | --- | --- | --- |
-| [CI](.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) / Docker 이미지 빌드 검증 |
-| [main guard](.github/workflows/main-guard.yml) | `main` 대상 PR | 출발 브랜치가 `develop`이 아니면 실패 |
-| [CD](.github/workflows/cd.yml) | `main` push | Docker 이미지 빌드 → GHCR 업로드 → VM에서 `docker compose` 재기동 ([VM 배포 안내](deploy/README.md)) |
+| [CI](../.github/workflows/ci.yml) | `main` 외 브랜치 push, `develop` 대상 PR | 프론트엔드: `npm ci` → 타입 검사 → 테스트 → 빌드 / 백엔드: `pytest` (가짜 엔진) / Docker 이미지 빌드 검증 |
+| [main guard](../.github/workflows/main-guard.yml) | `main` 대상 PR | 출발 브랜치가 `develop`이 아니면 실패 |
+| [CD](../.github/workflows/cd.yml) | `main` push | Docker 이미지 빌드 → GHCR 업로드 → VM에서 `docker compose` 재기동 ([VM 배포 안내](DEPLOY.md)) |
 
 - CI 결과: PR 하단 Checks 또는 저장소 **Actions** 탭에서 확인, 실패 시 로그 확인 후 같은 브랜치에 수정 커밋 push
 - push 전 로컬 확인 권장: `frontend/`에서 `npm run typecheck && npm test`, `backend/`에서 `python -m pytest`
@@ -113,10 +113,24 @@ gitGraph
 
 ## 비밀 정보 관리
 
-- `.env` 커밋 금지, [`backend/.env.example`](backend/.env.example) 복사 후 사용
-- API 키는 건한으로부터 비공개 채널로 수령, PR · 커밋 · 단톡 공지 내 키 기재 금지
-- 키 노출 시 즉시 건한에게 보고 및 Console에서 키 폐기
+- 원칙: API 키는 팀원에게 배포하지 않음. 로컬 개발은 `ENGINE_IMPL=fake`(가짜 엔진)로 키 없이 진행, 실제 키는 VM `~/roommate/.env`에만 보관
+- 실제 엔진 테스트 필요 시 건한이 사용 한도를 건 개인별 키 발급, 작업 종료 후 폐기
+- `.env` 커밋 금지, [`backend/.env.example`](../backend/.env.example) 복사 후 사용. PR · 커밋 · 단톡 공지 내 키 기재 금지
 
-## 실행 방법
+| 차단 장치 | 단계 | 동작 |
+| --- | --- | --- |
+| `.gitignore` | `git add` | `.env` · 키 · 인증서 파일 추적 제외 |
+| pre-commit hook ([`.githooks/pre-commit`](../.githooks/pre-commit)) | 커밋 | `.env` 파일 · API 키 · 토큰 · 개인키 문자열 포함 시 커밋 거부 |
+| GitHub Push protection | push | 알려진 형식의 키가 포함된 push 거부 |
+| CI `secret scan` ([`scripts/check-secrets.sh`](../scripts/check-secrets.sh)) | PR | 검사 실패 시 `develop` · `main` 병합 불가 |
+| Environment `production` | 배포 | VM 접속 정보는 `main` 배포 job에서만 접근 가능 |
+| CODEOWNERS | 리뷰 | `.github/` · `scripts/` · `deploy/` · `.gitignore` · Dockerfile 변경은 건한 승인 필수 |
 
-- 개발 착수(10/27) 후 각 폴더 README에 정리 예정: [frontend](frontend/README.md) · [backend](backend/README.md) · [engine](engine/README.md)
+- pre-commit hook 활성화(최초 1회, 저장소 루트): `git config core.hooksPath .githooks` (`frontend/`에서 `npm install` 시 자동 설정)
+- 검사 우회(`--no-verify` 등) 금지. 오탐 시 건한에게 문의
+- 키 노출 시 즉시 건한에게 보고 → Console에서 키 폐기 · 재발급 (커밋 삭제만으로는 불충분)
+
+## 문서 위치
+
+- 모든 문서는 `docs/`에 통합 ([문서 목록](README.md))
+- 영역별 문서: [frontend](frontend/README.md) · [backend](backend/README.md) · [engine](engine/README.md) · [data](data/SEED.md) · [배포](DEPLOY.md)

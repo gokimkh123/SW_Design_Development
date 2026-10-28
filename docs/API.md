@@ -7,7 +7,7 @@
 | 담당 | 백엔드 일준 · 범찬, 프론트엔드 동현, 엔진 인터페이스 건한 |
 | 변경 규칙 | 이 문서를 먼저 고치는 PR → 동현 + 백엔드 1명 승인 → 구현 |
 | 구현 후 기준 | FastAPI 자동 생성 문서(`http://localhost:8000/docs`). 불일치 시 본 문서 수정 |
-| 함께 보는 문서 | [PRD](PRD.md) · [일정](SCHEDULE.md) · [협업 가이드](../CONTRIBUTING.md) |
+| 함께 보는 문서 | [PRD](PRD.md) · [일정](SCHEDULE.md) · [협업 가이드](CONTRIBUTING.md) |
 
 ## 목차
 

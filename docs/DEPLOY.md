@@ -34,7 +34,7 @@ flowchart LR
 
 1. Docker Engine 및 Compose 플러그인 설치 (`docker compose version`으로 확인)
 2. 배포 계정을 `docker` 그룹에 추가: `sudo usermod -aG docker <계정>` 후 재접속
-3. 배포 전용 SSH 키 생성 (로컬): `ssh-keygen -t ed25519 -f roommate_deploy -N ""`
+3. 배포 전용 SSH 키 생성 (로컬, 저장소 폴더 밖): `ssh-keygen -t ed25519 -f ~/.ssh/roommate_deploy -N ""`
 4. 공개키(`roommate_deploy.pub`)를 VM 배포 계정의 `~/.ssh/authorized_keys`에 추가
 5. VM에 `~/roommate/.env` 작성 (커밋 금지)
 
@@ -54,7 +54,7 @@ chmod 600 .env
 ```
 
 6. 방화벽에서 `WEB_PORT`(기본 80) 및 SSH 포트 허용
-7. GitHub 저장소 **Settings → Secrets and variables → Actions → New repository secret** 등록
+7. GitHub 저장소 **Settings → Environments → `production` → Environment secrets → Add secret** 등록 (Repository secret 사용 금지: 작업 브랜치 워크플로에서 접근 가능)
 
 | Secret | 값 | 필수 |
 | --- | --- | --- |
