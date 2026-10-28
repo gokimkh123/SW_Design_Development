@@ -1,0 +1,22 @@
+# VM 실행 구성 (CD가 ~/roommate/에 복사 후 docker compose pull · up 실행)
+# 같은 폴더의 .env: 백엔드 환경변수(API 키 등) + WEB_PORT, VM에서 직접 작성 (커밋 금지)
+services:
+  frontend:
+    image: ghcr.io/gokimkh123/roommate-frontend:latest
+    ports:
+      - "${WEB_PORT:-80}:80"
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/gokimkh123/roommate-backend:latest
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////srv/var/roommate.db
+    volumes:
+      - backend-db:/srv/var
+    restart: unless-stopped
+
+volumes:
+  backend-db:
