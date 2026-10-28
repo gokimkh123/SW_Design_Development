@@ -43,7 +43,7 @@ flowchart LR
 6. **`main` 반영 · 배포** — 건한이 `develop` CI 통과 확인 후 `develop` → `main` PR 병합 → CD 자동 실행
 7. **`develop` 상시 실행 가능 상태 유지** — CI 실패 코드는 자동 병합되지 않음. 자동 병합 후 `develop` CI 실패 시 원인 브랜치 담당자가 수정 push, 발표회 버전은 `main`에서 실행
 
-- `frontend` · `backend` 브랜치는 삭제하지 않음, 팀원은 `develop` · `main`에 직접 push 금지
+- 팀원은 `develop` · `main`에 직접 push 금지 (아래 브랜치 보호 참고)
 - 문서 · 엔진 · 데이터(건한): 단기 브랜치(`docs/…` 등) → `develop` PR 병합
 - 코드 리뷰: 자동 병합 체계로 PR 승인 절차 생략. 리뷰 짝은 `develop` 반영 후 내용을 확인하고 문제 시 담당자에게 공유
 
@@ -51,8 +51,20 @@ flowchart LR
 
 - 대상: `.github/` · `.githooks/` · `scripts/` · `deploy/` · `docs/common/` · `.gitignore` · `.gitattributes` · `.dockerignore` · `Dockerfile`
 - 위 경로 변경이 포함된 push는 CI 통과 후에도 자동 병합 중단 (CI/CD · 보안 설정 및 공통 문서 무단 변경 방지)
-- 반영 방법: 해당 변경만 단기 브랜치(`chore/…` · `docs/…`)로 분리 → `develop` 대상 PR 생성 → 건한 승인 후 **Create a merge commit**
+- 반영 방법: 해당 변경만 단기 브랜치(`chore/…` · `docs/…`)로 분리 → `develop` 대상 PR 생성 → 건한 승인 후 병합
+- 병합 방식: 단기 브랜치 PR은 **Squash and merge**, `frontend` · `backend` 출발 PR은 **Create a merge commit** (장기 브랜치 이력 보존)
 - `frontend` · `backend` 브랜치에 이미 보호 경로 변경을 커밋한 경우: 해당 브랜치 → `develop` PR 생성, 건한 승인 · 병합 전까지 자동 병합 중단 상태 유지
+
+### 브랜치 보호 (10/28 설정)
+
+| 브랜치 | 설정 | 효과 |
+| --- | --- | --- |
+| `main` | PR 필수, 필수 체크 `source branch is develop` · `secret scan`, 강제 push · 삭제 금지 | 직접 push 불가, `develop` 출발 · 비밀 정보 검사 통과 PR만 병합 |
+| `develop` | 강제 push · 삭제 금지 | PR · 체크 필수 미적용 (적용 시 자동 병합 불가) |
+| `frontend` · `backend` | 강제 push · 삭제 금지 | 병합 후 자동 삭제 대상에서 제외, 이력 보존 (`git push --force` 대신 `git pull` 후 push) |
+
+- 저장소 설정 "Automatically delete head branches" 사용: PR 병합 시 단기 브랜치 자동 삭제
+- `develop` 직접 push는 기술적으로 차단되지 않으므로 규칙으로 금지 (건한의 `develop` → `main` PR 검토 시 확인)
 
 ## CI/CD
 
