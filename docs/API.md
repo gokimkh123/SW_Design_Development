@@ -649,6 +649,7 @@ async def rephrase(memo: str, sender: Persona, receiver: Persona) -> Rephrased: 
 | --- | --- |
 | 모델 | `engine/models.py`의 Pydantic 모델. 필드 이름은 본 문서 3장과 동일 (ID 필드는 백엔드 부여) |
 | 이벤트 | `SimEvent` 형식은 `{ "type": "utterance", "data": {...} }`로 5장 SSE 이벤트와 동일. 백엔드는 수신 이벤트 저장 후 SSE로 그대로 전달 |
+| 이벤트 범위 (10/28 확정) | 엔진 `simulate()`는 장면 이벤트(`scene_started` · `utterance` · `scene_judged` · `error`)만 반환. `simulation_started` · `simulation_completed`는 백엔드 시뮬레이션 실행기가 생성 |
 | 의존성 | 엔진의 FastAPI · DB 비의존. 순수 Python + Anthropic SDK |
 | 가짜 엔진 | `engine/fake.py`: 동일 함수명으로 `data/replays/` 결과 반환. 엔진 완성 전 백엔드 개발 및 `replay` 모드 공용 |
 | 단독 실행 | `python -m engine.cli simulate --me per_haneul --candidate per_daeun`로 터미널 내 결과 확인 지원 |
