@@ -1,10 +1,12 @@
-# 기능: 사용자와 페르소나 테이블을 안전하게 준비하고 DB 연결을 관리한다.
+# 기능: 사용자·페르소나·시뮬레이션 테이블을 안전하게 준비하고 DB 연결을 관리한다.
 # 시스템 범위: 모든 앱 저장 모듈이 사용하는 SQLite 연결과 트랜잭션을 담당한다.
 # 결과: 외래키를 적용하고 성공 시 커밋, 실패 시 롤백하며 연결을 항상 닫는다.
 from contextlib import contextmanager
 from collections.abc import Iterator
 from pathlib import Path
 import sqlite3
+
+from app.simulation_schema import SCHEMAS as SIMULATION_SCHEMAS, INDEXES
 
 SCHEMAS = {
     'users': '''CREATE TABLE users (
@@ -28,6 +30,8 @@ SCHEMAS = {
         created_at TEXT NOT NULL
     )''',
 }
+
+SCHEMAS.update(SIMULATION_SCHEMAS)
 
 
 class SchemaConflictError(RuntimeError):
@@ -65,13 +69,25 @@ def initialize_database(db_path: Path) -> None:
     with connect_database(':memory:') as expected:
         for sql in SCHEMAS.values():
             expected.execute(sql)
+        for sql in INDEXES.values():
+            expected.execute(sql)
         with connect_database(db_path) as db:
             db.execute('BEGIN IMMEDIATE')
-            existing = dict(db.execute("SELECT name, type FROM sqlite_master WHERE name IN ('users', 'personas')"))
+            existing = dict(db.execute("SELECT name, type FROM sqlite_master"))
             for table in SCHEMAS:
                 if table in existing and (existing[table] != 'table' or
                         _structure(db, table) != _structure(expected, table)):
                     raise SchemaConflictError(f'{table} 테이블 구조 충돌: 기존 데이터를 보존했습니다. 수동 검토가 필요합니다.')
+            # 추가 테이블의 CHECK와 부분 UNIQUE 조건도 비교한다. 충돌 시 DDL 전에 중단한다.
+            for name in (*SIMULATION_SCHEMAS, *INDEXES):
+                if name in existing:
+                    actual = db.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0]
+                    wanted = expected.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0]
+                    if actual != wanted:
+                        raise SchemaConflictError(f'{name} 구조 충돌: 기존 데이터를 보존했습니다.')
             for table, sql in SCHEMAS.items():
                 if table not in existing:
+                    db.execute(sql)
+            for name, sql in INDEXES.items():
+                if name not in existing:
                     db.execute(sql)

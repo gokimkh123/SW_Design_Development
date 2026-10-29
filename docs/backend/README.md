@@ -60,7 +60,7 @@ backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --port 8000
 
 ## 사용자 · 페르소나 DB
 
-- `app/database.py`의 `initialize_database(path)`가 두 테이블을 준비한다. 반복 실행해도 기존 행을 보존하며, 기존 컬럼·외래키·UNIQUE 구조가 다르면 `SchemaConflictError`로 중단한다. 자동 삭제·재생성·이관은 하지 않는다.
+- `app/database.py`의 `initialize_database(path)`가 사용자·페르소나와 아래 시뮬레이션 저장 테이블을 준비한다. 반복 실행해도 기존 행을 보존하며, 기존 컬럼·외래키·UNIQUE 구조가 다르면 `SchemaConflictError`로 중단한다. 자동 삭제·재생성·이관은 하지 않는다.
 - 사용자 저장과 페르소나 저장·조회가 지연 초기화를 호출한다. 앱 import, health, 설문 요청만으로 DB를 만들지 않는다. `config.py`의 경로 처리와 우선순위는 그대로 유지한다.
 - 모든 앱 DB 연결은 `connect_database(path)`를 사용한다. 연결마다 `PRAGMA foreign_keys = ON`, 블록 성공 시 커밋, 예외 시 롤백, 마지막에 연결 종료를 수행한다. 초기화 DDL도 하나의 명시적 트랜잭션이다.
 
@@ -243,3 +243,123 @@ with TemporaryDirectory() as directory:
 ```
 
 테스트는 점수·사사오입, 순위·동점·본인 제외·후보 부족, 응답 필드·개인정보 제외, 사용자·소유권 확인, 시드·DB 데이터 오류를 검증한다. 실제 시드 파일을 임시 위치로 복사하여 사용자 생성 → 페르소나 생성 → 후보 조회 흐름도 검사한다.
+
+## 시뮬레이션 저장 구조 · 실행기 연결 (작업 1)
+
+`app/simulations.py`는 실행기·시작 API·상태 조회·SSE·완료 리포트가 공유할 저장 계층이다. 이번 구현은 SQLite 저장과 조회만 제공한다. 실제 실행 루프, 엔진 호출, 작업 큐, HTTP 경로, SSE 전송과 리포트 계산은 아직 연결하지 않았다. 기존 후보 API의 `simulation: null`도 그대로다. 작업 1~4는 기존 범찬 담당 연결·리포트 부분을 포함하여 일준이 진행하며, 위 분담 표는 10/28 당시 협의 기록이다.
+
+### 테이블 관계와 기존 DB 보존
+
+| 테이블 | 관계와 저장 내용 |
+| --- | --- |
+| `simulations` | `user_id → users`, `persona_id → personas` FK. 실행 ID, 후보 ID, API 모드, 엔진 모드, 상태, 별칭, 진행률, KST 시각, 입력 스냅샷, 완료 결과와 실패 정보 |
+| `simulation_scenes` | `simulation_id → simulations` FK, `(simulation_id, scene_index)` PK. 공개 장면 스냅샷, 순서 있는 발화 목록, 판정 JSON |
+| `simulation_events` | `simulation_id → simulations` FK, `(simulation_id, sequence)` PK. 실행별 이벤트 ID와 재시도 키 각각 UNIQUE. 공개 `data`, 내부 `internal_data`, 유형, KST 저장 시각 |
+
+- 시드 후보는 `data/seed/personas.json`에 있고 `personas`에는 없으므로 `candidate_id`는 출처 식별용 TEXT다. 후보 ID에 FK를 걸거나 시드 사용자·페르소나를 DB에 복제하지 않는다. DB 후보는 생성 트랜잭션 안에서 실제 페르소나를 읽고, JSON 시드는 호출자가 검증·선정한 원본을 넘긴다. 장면 템플릿도 JSON 입력 스냅샷으로 보관하고 별도 장면 원본 테이블은 만들지 않는다. PRD 10.3의 초안 FK 그림을 물리적으로 그대로 적용하지 않는 이유다. 매칭·생활 규칙 테이블은 없다.
+- `initialize_database(path)`가 기존 users/personas를 보존하면서 세 테이블과 두 인덱스를 **추가**한다. 기존 두 테이블의 컬럼·제약은 바꾸지 않는다. 초기화 전체를 `BEGIN IMMEDIATE`로 처리하므로 실패하면 추가 DDL도 롤백된다.
+- 반복 초기화를 지원한다. 구조가 다른 동명 테이블·인덱스가 있으면 `SchemaConflictError`로 중단한다. 새 테이블의 CHECK와 부분 UNIQUE 조건도 검사하며, 동일 의미라도 DDL 문자열이 다르면 수동 검토가 필요하다. 자동 DROP·재생성·데이터 이관은 없다. 이 버전의 기존 DB 확장은 추가 DDL만으로 충분하며, 향후 구조 변경은 백업 후 별도 보존형 마이그레이션을 마련해야 한다.
+- `connect_database`를 그대로 사용한다. 매 연결 FK 활성화, 성공 커밋·실패 롤백·항상 연결 종료. 저장은 `BEGIN IMMEDIATE`, 여러 SELECT를 조합하는 조회도 읽기 트랜잭션으로 일관된 스냅샷을 읽는다. 모든 값은 SQL 바인딩한다. 실제 개발 DB에 초기화·테스트를 실행하지 않았다.
+
+### 입력 · 공개 데이터 · 모드
+
+`simulations.inputs`에는 생성 당시 본인 Persona, 후보 원본(시드 메타데이터 포함), 장면 템플릿 목록을 JSON으로 고정한다. 본인 선호·닉네임이나 시드 JSON이 바뀌어도 기존 실행을 다시 읽어 갱신하지 않는다. 별칭도 생성 시점 값을 유지한다. `get_internal_record`는 이 원본과 실패 상세를 포함하므로 내부 운영용으로만 사용하고 HTTP/SSE 응답으로 반환하지 않는다.
+
+`engine_inputs`의 후보는 Persona 필드만 선별하고 `nickname`을 `후보 A/B/C`로 바꾼다. 원본 `name`, `answers`, `greeting`, 학과 등은 엔진 입력에서 제외한다. 알려진 후보 `name`/`nickname`은 자유 문구에서도 별칭으로 치환한다. 공개 이벤트는 유형별 허용 필드를 검증하고 동일한 치환을 적용하며 후보 발화의 `name`은 저장된 별칭 + ` AI`로 강제한다. 원본 이벤트는 내부 컬럼에만 저장한다. 후속 실행기는 반드시 `get_execution_inputs`의 입력을 사용해야 한다. 이 치환은 알려진 원본 이름에 대한 방어이며 LLM이 임의로 생성한 다른 개인정보를 판별하는 기능은 아니다.
+
+- API 모드 `mode`: `live`/`replay`. `create_or_reuse_simulation`에는 **실제 실행 모드**를 전달한다. replay 파일이 없으면 호출 계층에서 먼저 live로 결정한다. 저장 계층은 파일을 탐색하거나 fallback을 결정하지 않는다.
+- `engine_mode`: live 생성 시 기존 `engine_adapter.resolve_mode('live')`로 `SIM_MODE`의 `agents`/`single`을 확정하여 저장한다. 이후 환경변수가 바뀌어도 저장된 값을 `EngineAdapter.simulate(mode=...)`에 전달한다. replay의 엔진 모드는 NULL이고 엔진을 호출하면 안 된다.
+- 입력의 장면 목록 길이를 `total`로 사용한다(서비스 기본 20). 장면 ID 중복은 거부한다. 테스트·단축 시연을 위해 개수 자체를 20으로 강제하지 않는다.
+
+### 저장 함수 계약
+
+모든 함수의 첫 인수는 DB 경로다. 생성 외 조회·저장 함수는 `simulation_id`와 선택적인 `user_id=...`를 받는다. 공개 요청 경계에서는 반드시 소유자 ID를 전달한다. `user_id=None`은 내부 작업용이다. 다른 소유자와 미존재 실행은 조회에서 동일하게 `None`, 저장에서 `LookupError`다. 형식 오류는 `ValueError`/Pydantic 검증 오류, 상태·순서·재시도 충돌은 `StorageConflictError`, DB 오류는 SQLite 예외로 전파한다. HTTP 오류 변환은 후속 API의 책임이다.
+
+| 함수 | 입력 · 반환 · 책임 |
+| --- | --- |
+| `create_or_reuse_simulation(path, *, user_id, persona_id, candidate, alias, scenes, mode='live')` | `candidate`는 선정된 시드 원본 dict 또는 DB 후보의 `persona_id`, `is_seed=false`를 포함한 dict. `scenes`는 템플릿 목록. `(Simulation dict, created: bool)` 반환. 소유자 확인·본인 제외·입력 고정·실행 생성/재사용을 한 트랜잭션에서 처리 |
+| `get_simulation(path, id, user_id=...)` | API 3장의 Simulation 필드만 반환. 진행률·판정 개수·점수·시작/완료 시각 포함, 원본 입력과 내부 모드는 제외 |
+| `get_execution_inputs(path, id, user_id=...)` | 익명 `me`, `candidate`, `scenes`, 실제 `mode`, 고정 `engine_mode` 반환. 내부 실행기용 |
+| `get_internal_record(path, id, user_id=...)` | 실행 행과 복원된 원본/엔진 JSON·완료/실패 자료. 원본 실명 포함, 공개 금지 |
+| `start_simulation(path, id, user_id=...)` | 입력 스냅샷에서 `simulation_started` 생성·저장. `{id, sequence, type, data}` 반환. 엔진이나 작업을 시작하지 않음 |
+| `save_event(path, id, event, user_id=...)` | 실제 어댑터 형태 `{type, data}`를 받는다. 장면 시작·발화·판정 및 관련 진행률을 원자적으로 저장하고 공개 이벤트 반환. `error`는 실패 함수로 위임 |
+| `update_progress(path, id, user_id=...)` | 저장된 판정 수에서 `{done, total}` 재계산. 증가량을 받지 않으며 판정 저장 시 이미 같은 트랜잭션에서 갱신됨 |
+| `complete_simulation(path, id, *, score, headline, report=None, user_id=...)` | 외부에서 계산한 0~100 정수 점수·문구·선택적인 완성 리포트 dict를 받아 완료 결과와 `simulation_completed`를 함께 저장. 판정 개수는 DB에서 산출, 점수/리포트 계산은 수행하지 않음 |
+| `fail_simulation(path, id, error, user_id=...)` | `{code, message, scene_index: int 또는 null, retryable: bool}` 검증 후 실패 시각·정보·종료 error 이벤트를 함께 저장. 생략한 scene_index는 null |
+| `list_scenes(path, id, user_id=...)` | 장면 순서의 공개 장면·대화·판정. 진행 중인 미판정 장면에는 판정 필드가 없음 |
+| `list_events(path, id, after_event_id=None, user_id=...)` | 전역 sequence 순 공개 이벤트 목록. ID 미지정은 전체, 지정하면 해당 ID **이후**. 해당 실행에 없는 ID는 ValueError, 마지막 ID 이후는 빈 목록 |
+| `get_completion(path, id, user_id=...)` | 저장된 `{score, headline, verdict_counts, report}`. 미완료는 StorageConflictError. report는 아직 계산하지 않았다면 null |
+
+완료 함수의 `report`에는 후속 리포트 계층이 API Report 형식으로 만든 공개 데이터만 전달한다. 저장 함수는 그 리포트를 계산하거나 Report 스키마 전체를 검증하지 않는다. 후속 계층에서 simulation_id, score, verdict_counts 등의 일치를 검증해야 한다.
+
+### 재사용 · 상태 전이 · 순서
+
+- API 4.8에 따라 **동일 persona_id + candidate_id + 실제 mode**의 running/completed를 재사용한다. 입력 해시·현재 SIM_MODE·수정된 선호·별칭을 재사용 키에 추가하지 않는다. completed도 원래 스냅샷을 유지한다. failed 이후에는 새로운 실행을 만들 수 있다.
+- 이번 생성 함수는 API가 허용하는 `running` 상태로 실행을 원자적으로 예약한다. `started_at`은 이 예약 시각이며 첫 엔진 호출 시각이 아니다. `created=true`를 받은 호출자만 후속 작업을 등록한다. `created=false`면 재실행하지 않는다. 이 반환값은 작업 큐나 다중 worker lease를 대체하지 않는다.
+- `BEGIN IMMEDIATE`와 `(persona_id,candidate_id,mode)`의 부분 UNIQUE 인덱스를 함께 사용한다. 인덱스는 queued/running/completed에 적용한다. queued는 이번 생성 함수가 만들지 않는다. 기존 queued가 발견되면 충돌 예외를 내고 추가 생성하지 않는다. **queued 재요청의 HTTP 처리·대기열 정책은 API 4.8에 없으므로 작업 2에서 결정해야 한다.** 이 구현은 queued를 running/completed와 같은 API 재사용 대상으로 임의 확장하지 않는다.
+- 허용 전이: `queued → running/failed`, `running → completed/failed`. completed/failed는 종단 상태다. queued → running은 `start_simulation`이 처리한다. 동일 시작·완료·실패 요청은 내용이 같으면 기존 이벤트를 반환한다. 종료 후 새 장면·새 판정·반대 종료 상태는 거부한다. 상태 변경은 전용 함수를 거쳐야 한다.
+- 장면은 1부터 시작하고 이전 판정 완료 후 다음 장면을 시작한다. 입력 스냅샷의 scene_id를 확인한다. 발화 turn은 1~4의 연속 정수다. 판정 보류 pending도 처리된 장면 1개로 계산한다. 판정 progress가 `{done: scene_index, total: 저장 total}`과 다르면 전체 저장을 거부한다.
+- 재시도 키는 시작/완료/실패 각각 하나, 장면 시작·판정은 유형+scene_index, 발화는 유형+scene_index+turn이다. 같은 키·같은 정규화 입력은 기존 이벤트 반환, 내용이 다르면 충돌이다. 종료 후에도 이미 저장된 동일 장면 이벤트 재시도는 기존 값을 반환한다. 중복 판정이 진행률을 늘리지 않는다.
+- 시작 ID는 `0-0`. 장면별 이벤트 ID는 `{scene_index}-{0부터의 순번}`, 별도 `sequence`는 실행 전체에서 1부터 증가한다. 완료 이벤트는 마지막 장면의 다음 순번이다. error는 명시된 오류 scene_index의 다음 순번을 쓰고, 장면 무관 오류는 마지막 시작 장면(없으면 0)을 사용한다. 문자열 ID의 사전순으로 정렬하지 않는다. ID는 실행 안에서만 유일하다.
+- 저장에 성공한 반환 이벤트만 후속 SSE가 전송해야 한다. 재연결은 `list_events(after_event_id=Last-Event-ID)`를 사용한다. ping, 전송 속도, 연결 종료는 저장 함수의 책임이 아니다. 완료 후에도 모든 저장 이벤트를 읽을 수 있다.
+
+### 후속 실행기 연결 순서와 제한
+
+1. 사용자·후보 선정과 replay 파일 존재 여부를 확인하고 실제 모드를 결정한다. `create_or_reuse_simulation`을 호출한다. 신규일 때만 실행 작업을 예약한다.
+2. `get_execution_inputs`로 고정 입력을 읽고 `start_simulation`을 저장한다. 이후 live 실행은 익명 입력과 고정 engine_mode로 어댑터를 호출하고 replay는 파일 이벤트를 읽는다. **이 단계의 실행기와 엔진 호출 코드는 이번에 구현하지 않았다.**
+3. 어댑터는 `scene_started`, `utterance`, `scene_judged`, `error`만 반환한다. 각 이벤트를 `save_event`에 전달하고 커밋된 공개 반환값을 사용한다. fake_engine의 판정은 scene_id가 없으므로 저장된 장면에서 보충한다. 실제 모델이 scene_id를 주면 일치 여부를 확인한다.
+4. 판정 저장 시 장면·이벤트·진행률이 함께 커밋된다. 별도 진행률 확인이 필요하면 `get_simulation`, 재계산이 필요하면 `update_progress`를 사용한다. 별도로 done을 증가시키지 않는다.
+5. 모든 장면이 끝나면 공개 `list_scenes`에서 판정을 읽어 후속 계층에서 점수·headline·리포트를 계산한다. 엔진 SceneJudgement가 필요하면 scene_index, `scene.scene_id`, verdict, reason, agreement, rule_candidate, unresolved를 구성한다. 결과를 `complete_simulation`에 전달한다. 오류는 `fail_simulation`에 전달한다. 예외를 공개 문구로 안전하게 변환하는 책임도 실행기에 있다.
+
+현재 `EngineAdapter.simulate`는 장면 템플릿 목록을 인수로 받지 않고 엔진이 직접 읽는다. 저장된 scenes는 감사·순서 검증용이며, 향후 실행기가 원본 템플릿 변경 후 완전히 동일한 장면을 재현하려면 엔진 인터페이스 협의 또는 고정 replay가 필요하다. 이번에 공통 명세나 어댑터 계약을 변경하지 않았다.
+
+서버 재시작 시 queued/running은 DB에 남으며 자동 재실행·자동 실패 전환하지 않는다. 단순 시간 경과만으로 실패를 확정하면 살아 있는 다른 worker와 충돌할 수 있다. 운영자는 이전 worker가 종료되었음을 확인한 뒤 해당 실행을 `fail_simulation`으로 실패 처리하고, 사용자의 새 시작 요청으로 새 ID를 만들도록 한다. 오류 코드는 기존 `INTERNAL_ERROR`, 공개 문구는 예를 들어 `서버 재시작으로 실행이 중단되었습니다.`, retryable=false를 사용한다. 여기서 retryable은 SSE 재연결 여부이며 엔진 자동 재실행 권한이 아니다. 작업 큐·lease·자동 복구는 후속 범위다.
+
+### 터미널에서 임시 DB 저장 · 조회
+
+backend 디렉터리에서 실행한다. 실제 개발 DB나 API 서버를 사용하지 않는다.
+
+```bash
+.venv/bin/python - <<'PY'
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from app.personas import PersonaData, create_persona
+from app.users import create_user
+from app.simulations import (
+    create_or_reuse_simulation, get_execution_inputs, get_simulation,
+    start_simulation, save_event, list_events, list_scenes,
+)
+
+seeds = json.loads(Path('../data/seed/personas.json').read_text())['personas']
+candidate = next(p for p in seeds if p['candidate_pool'])
+scene = dict(scene_id='S01', day=1, weekday='월', time='06:30',
+             category='수면·소음', title='이른 알람', situation='후보 A와 알람 시간 조율')
+with TemporaryDirectory() as temp:
+    db = Path(temp) / 'simulation.sqlite3'
+    user = create_user(db, '테스터')
+    data = {key: seeds[0][key] for key in PersonaData.model_fields}
+    data['is_seed'] = False
+    me = create_persona(db, user['user_id'], data)
+    simulation, created = create_or_reuse_simulation(
+        db, user_id=user['user_id'], persona_id=me['persona_id'],
+        candidate=candidate, alias='후보 A', scenes=[scene], mode='live',
+    )
+    sid = simulation['simulation_id']
+    print('새 실행:', created, '엔진 모드:', get_execution_inputs(db, sid)['engine_mode'])
+    start_simulation(db, sid)
+    save_event(db, sid, {'type': 'scene_started', 'data': {'scene_index': 1, 'scene': scene}})
+    print(get_simulation(db, sid, user_id=user['user_id']))
+    print(list_scenes(db, sid))
+    print(list_events(db, sid, after_event_id='0-0', user_id=user['user_id']))
+PY
+```
+
+검증 명령 (backend 디렉터리):
+
+```bash
+.venv/bin/python -m pytest tests/test_simulations.py tests/test_personas_database.py -q
+.venv/bin/python -m pytest tests -q
+```
+
+새 저장 테스트는 임시 DB로 기존 행 보존·반복 초기화·스키마 충돌 보존, 입력 고정, JSON 시드와 DB 후보, 모드, 사용자 범위, 동시 실행 생성·동시 판정 재시도, DB 유일성, 상태 전이, 실제 가짜 엔진 20장면, 순서·익명화, 진행률·완료·실패 일관성, 이벤트 커서, 재연결, ID 충돌, 이벤트 INSERT 실패 시 장면/진행률/종료 상태 롤백을 검사한다. 실제 LLM·HTTP 시뮬레이션·SSE 전송 검사는 작업 1 범위에 포함하지 않는다.
