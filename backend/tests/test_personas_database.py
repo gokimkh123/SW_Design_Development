@@ -115,7 +115,7 @@ def test_empty_initialization_and_unique_conflict(tmp_path):
     initialize_database(path)
     initialize_database(path)
     with connect_database(path) as db:
-        assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")} == {'users', 'personas'}
+        assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")} == {'users', 'personas', 'simulations', 'simulation_scenes', 'simulation_events'}
         db.execute('CREATE UNIQUE INDEX one_persona ON personas(user_id)')
     with pytest.raises(SchemaConflictError, match='personas'):
         initialize_database(path)
