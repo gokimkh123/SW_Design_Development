@@ -76,7 +76,8 @@ backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --port 8000
 - 닉네임은 중복 저장하지 않고 `users`와 JOIN하여 현재 값을 반환한다. 닉네임 변경 후 오래된 복사본이 남는 문제를 방지한다. 생성 당시 닉네임 스냅샷은 저장하지 않는다.
 - `sleep`에는 bedtime/wake/exam_pattern, `axes`와 `axis_labels`에는 생활 성향 5개 축, `preferences`에는 temperature를 저장한다. API Persona 모델의 모든 정보를 반환한다.
 - `create_persona(path, user_id, data)`는 기존 사용자 ID를 호출 계층에서 받는다. data는 아래 예시처럼 내용만 전달한다. 저장 계층이 `per_` + 영문 소문자·숫자 8자리 ID와 timezone-aware KST ISO 8601 생성 시각을 부여한다. 기본키 충돌만 최대 10회 재시도하고 소진 시 RuntimeError, 없는 사용자 저장은 SQLite IntegrityError를 전파한다.
-- `get_persona(path, persona_id)`는 닉네임 포함 dict 또는 미존재 시 None을 반환한다. DB·JSON 오류는 숨기지 않는다. 향후 API 계층이 이를 HTTP 응답으로 변환해야 한다. API 경로와 엔진 호출은 이번 구현에 포함하지 않는다.
+- `get_persona(path, persona_id)`는 닉네임 포함 dict 또는 미존재 시 None을 반환한다. API에서는 `user_id` 조건을 함께 전달하여 다른 사용자의 데이터를 조회하지 않는다. DB·JSON 오류는 공통 HTTP 오류로 변환한다.
+- `update_preferences(path, persona_id, user_id, changes)`는 소유자의 `must_keep`·`okay_with`만 수정한다. 과거 시뮬레이션 결과는 변경하지 않는다.
 
 초기화만 실행 (backend 디렉터리에서, 환경변수는 실행 셸에 설정):
 
@@ -117,3 +118,51 @@ with TemporaryDirectory() as directory:
 ```
 
 테스트는 임시 DB만 사용한다. 반복 초기화, 기존 사용자 보존, 1:N 저장, JSON 자료형과 bool 복원, 재연결 후 저장 유지, 매 연결의 외래키, 기본키 중복, ID 충돌 재시도와 소진, 실패 트랜잭션 롤백, 연결 종료, 스키마 충돌 보존, 기존 API 전체를 검사한다. 실제 개발 DB에 테스트 페르소나를 넣지 않는다.
+
+## 페르소나 API 연결 (A4)
+
+- 기준: `docs/common/API.md` 4.4~4.6. `app/persona_api.py`에서 기존 엔진 어댑터와 DB 저장·조회 함수를 연결한다.
+- `POST /api/personas`는 `X-User-Id`로 등록 사용자를 확인하고 설문 12문항을 검증한 뒤 페르소나를 생성·저장하여 201로 반환한다. 닉네임은 사용자 DB에서 읽고 ID·KST 생성 시각은 저장 계층이 부여한다. 방문객 페르소나는 `is_seed=false`다.
+- 설문 응답은 실제 `/api/survey`의 선택값과 시간 범위·30분 간격으로 검사한다. 자정을 넘는 취침 범위를 허용한다. 문항 누락은 400 `SURVEY_INCOMPLETE`이며 빠진 ID를 표시한다. 잘못된 JSON·자료형·선택값·알 수 없는 필드는 422 `VALIDATION_ERROR`다.
+- `GET /api/personas/{persona_id}`는 본인 페르소나만 200으로 반환한다. 없는 ID와 다른 사용자의 ID는 동일하게 404 `PERSONA_NOT_FOUND`로 응답한다.
+- `PATCH /api/personas/{persona_id}`는 보낸 문구 목록만 수정한다. 각 목록 최대 3개·항목당 30자, 빈 배열로 비우기 가능, 명시적인 `null`과 다른 필드 수정은 422다. 빈 객체는 현재 값을 그대로 반환한다.
+- 세 경로 모두 헤더 누락·빈 값·미등록 사용자는 401 `USER_REQUIRED`다. 이 헤더는 발표회용 식별 규칙이며 실제 로그인 인증을 대체하지 않는다.
+- 로컬 검증은 `ENGINE_IMPL=fake`로 외부 LLM 호출 없이 진행한다. 실제 엔진의 LLM 실패는 기존 어댑터의 규칙 기반 대체를 사용한다. 엔진 대기가 8초를 넘으면 취소하고 가짜 엔진 어댑터로 대체하여 명세의 10초 응답 예산 중 저장 시간을 남긴다. 예상하지 못한 엔진·DB 오류는 500이며 불완전한 결과는 저장하지 않는다.
+
+### `/docs`에서 직접 확인
+
+1. 서버 실행 후 `http://localhost:8000/docs`를 연다.
+2. `POST /api/users`에 `{"nickname":"하늘"}`을 보내 반환된 `user_id`를 복사한다.
+3. `POST /api/personas`의 **Try it out**을 누르고 `X-User-Id` 입력칸에 복사한 값을 넣는다. 본문은 다음과 같다(실제 `/api/survey`의 문구·선택값 확정 시 대조 필요).
+
+```json
+{
+  "answers": {
+    "q01": {"bedtime": "23:00", "wake": "06:30"},
+    "q02": "sensitive",
+    "q03": "earlier",
+    "q04": "every_2_3_days",
+    "q05": "right_away",
+    "q06": "moderate",
+    "q07": "when_needed",
+    "q08": "all_separate",
+    "q09": "say_now",
+    "q10": "ask_now",
+    "q11": "say_now",
+    "q12": "after_friend_leaves"
+  }
+}
+```
+
+4. 201 응답의 `persona_id`를 복사하고 `GET /api/personas/{persona_id}`에 같은 사용자 헤더로 요청하여 저장된 결과를 확인한다.
+5. `PATCH /api/personas/{persona_id}`에 같은 사용자 헤더와 `{"must_keep":["밤에는 조용히"]}`를 보내 해당 목록만 바뀌는지 확인한다.
+6. `q12`를 빼면 400, 선택값을 바꾸면 422, 사용자 헤더를 빼면 401, 다른 사용자의 ID로 조회·수정하면 404인지 확인한다.
+
+페르소나 API 검사 (backend 폴더):
+
+```bash
+.venv/bin/python -m pytest tests/test_personas_api.py -q
+.venv/bin/python -m pytest -q
+```
+
+- 프론트엔드 `realApi`의 생성·조회·수정 경로 및 헤더와 동일하다. 실제 화면 연결은 백엔드 8000 실행 후 `VITE_USE_MOCK=false`로 프론트엔드를 재시작하여 확인한다. 후보·시뮬레이션 등 이후 API는 이번 범위에 포함하지 않으므로 전체 A~C 완주를 의미하지 않는다.

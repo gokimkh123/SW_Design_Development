@@ -1,6 +1,6 @@
-# 기능: 기존 상태 확인과 사용자 생성, 설문 제공 경로 및 공통 오류 응답을 등록한다.
-# 시스템 범위: DB 환경설정을 해석하고 FastAPI 앱을 사용자 저장 모듈과 앱에 포함된 설문 초안 로더에 연결한다.
-# 결과: health 200, 사용자 201, 설문 200 또는 한국어 설명을 담은 공통 오류 JSON을 반환한다.
+# 기능: 상태 확인·사용자·설문·페르소나 API와 공통 오류 응답을 등록한다.
+# 시스템 범위: DB 설정과 설문 로더, 페르소나의 엔진·저장 연결 경로를 구성한다.
+# 결과: 각 API의 명세 응답 또는 한국어 설명을 담은 공통 오류 JSON을 반환한다.
 import logging
 from pathlib import Path
 
@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from app.config import database_path
+from app.persona_api import PersonaAPIError, create_persona_router
 from app.survey import Survey, load_survey
 from app.users import UserCreate, UserResponse, create_user
 
@@ -40,7 +41,13 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
+        if request.url.path == '/api/personas' or request.url.path.startswith('/api/personas/'):
+            return error_response(422, 'VALIDATION_ERROR', '요청 JSON의 필드·자료형과 문구 길이를 확인해 주세요.')
         return error_response(422, 'VALIDATION_ERROR', '요청 JSON 형식을 확인해 주세요. 닉네임은 앞뒤 공백을 제외한 1~10자 문자열이어야 해요.')
+
+    @application.exception_handler(PersonaAPIError)
+    async def persona_error(request, exc):
+        return error_response(exc.status, exc.code, exc.message)
 
     @application.exception_handler(HTTPException)
     async def http_error(request, exc):
@@ -66,6 +73,7 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
     def survey():
         return load_survey(official, draft)
 
+    application.include_router(create_persona_router(database, official, draft, error_model=ErrorResponse))
     return application
 
 

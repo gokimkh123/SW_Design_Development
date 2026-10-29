@@ -1,6 +1,6 @@
-# 기능: 페르소나 정보를 저장하고 사용자 닉네임을 붙여 조회한다.
-# 시스템 범위: 다음 단계 API가 호출할 저장 계층이며 엔진과 HTTP 경로는 다루지 않는다.
-# 결과: ID와 KST 생성 시각을 부여하고 JSON을 원래 객체와 배열로 복원한다.
+# 기능: 페르소나 정보를 저장·조회하고 소유자의 생활 선호 문구를 수정한다.
+# 시스템 범위: 페르소나 API가 호출하는 저장 계층이며 엔진과 HTTP 경로는 다루지 않는다.
+# 결과: ID와 KST 시각, 복원한 JSON을 반환하며 소유권 조건으로 조회·수정을 제한한다.
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -62,12 +62,17 @@ def create_persona(db_path: Path, user_id: str, data: dict) -> dict:
         raise RuntimeError('페르소나 ID 생성 재시도 한도 초과')
 
 
-def get_persona(db_path: Path, persona_id: str) -> dict | None:
+def get_persona(db_path: Path, persona_id: str, *, user_id: str | None = None) -> dict | None:
     """없으면 None, DB 오류는 그대로 전파한다. HTTP 오류 변환은 API의 책임이다."""
     initialize_database(db_path)
     with connect_database(db_path) as db:
-        cursor = db.execute('SELECT p.*, u.nickname FROM personas p JOIN users u ON u.user_id=p.user_id '
-                            'WHERE p.persona_id=?', (persona_id,))
+        query = ('SELECT p.*, u.nickname FROM personas p JOIN users u ON u.user_id=p.user_id '
+                 'WHERE p.persona_id=?')
+        params = (persona_id,)
+        if user_id is not None:
+            query += ' AND p.user_id=?'
+            params += (user_id,)
+        cursor = db.execute(query, params)
         row = cursor.fetchone()
         if row is None:
             return None
@@ -76,3 +81,25 @@ def get_persona(db_path: Path, persona_id: str) -> dict | None:
             persona[field] = json.loads(persona[field])
         persona['is_seed'] = bool(persona['is_seed'])
         return persona
+
+
+def update_preferences(db_path: Path, persona_id: str, user_id: str,
+                       changes: dict[str, list[str]]) -> dict | None:
+    """허용한 문구만 수정한다. 과거 시뮬레이션 결과에는 접근하지 않는다."""
+    if not set(changes) <= {'must_keep', 'okay_with'}:
+        raise ValueError('수정할 수 없는 페르소나 항목입니다.')
+    # API 밖에서 호출해도 기존 저장 모델의 문구 제한을 적용한다.
+    for values in changes.values():
+        if (not isinstance(values, list) or len(values) > 3
+                or any(not isinstance(value, str) or len(value) > 30 for value in values)):
+            raise ValueError('각 문구는 30자 이내, 목록은 최대 3개여야 합니다.')
+    initialize_database(db_path)
+    if changes:
+        with connect_database(db_path) as db:
+            assignments = ', '.join(f'{field}=?' for field in changes)
+            values = [json.dumps(value, ensure_ascii=False) for value in changes.values()]
+            cursor = db.execute(f'UPDATE personas SET {assignments} WHERE persona_id=? AND user_id=?',
+                                (*values, persona_id, user_id))
+            if cursor.rowcount == 0:
+                return None
+    return get_persona(db_path, persona_id, user_id=user_id)
