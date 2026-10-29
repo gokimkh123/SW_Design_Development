@@ -44,3 +44,12 @@ def create_user(db_path: Path, nickname: str) -> dict[str, str]:
             if cursor.rowcount == 1:
                 return user
     raise RuntimeError('사용자 ID 생성 재시도 한도 초과')
+
+
+def get_user(db_path: Path, user_id: str) -> dict[str, str] | None:
+    """보호된 API에서 등록 사용자를 확인한다. 연결은 엔진 호출 전에 닫는다."""
+    initialize_database(db_path)
+    with connect_database(db_path) as db:
+        row = db.execute('SELECT user_id, nickname, created_at FROM users WHERE user_id=?',
+                         (user_id,)).fetchone()
+        return dict(zip(('user_id', 'nickname', 'created_at'), row)) if row else None
