@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
 from app.engine_adapter import EngineAdapter, get_engine, load_engine
+from app.candidates import CandidatesResponse, select_candidates
 from app.personas import PersonaData, create_persona, get_persona, update_preferences
 from app.survey import Survey, load_survey
 from app.users import get_user
@@ -82,7 +83,7 @@ def validate_answers(survey: Survey, answers: dict) -> None:
 
 
 def create_persona_router(database: Path, official: Path, draft: Path, *,
-                          error_model: type[BaseModel]) -> APIRouter:
+                          error_model: type[BaseModel], seed_path: Path) -> APIRouter:
     router = APIRouter(prefix='/api/personas', tags=['personas'],
                        responses={status: {'model': error_model} for status in (401, 422, 500)})
 
@@ -119,6 +120,14 @@ def create_persona_router(database: Path, official: Path, draft: Path, *,
         if persona is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
         return persona
+
+    @router.get('/{persona_id}/candidates', response_model=CandidatesResponse,
+                responses={404: {'model': error_model}})
+    def candidates(persona_id: str, user: Annotated[dict, Depends(require_user)]):
+        persona = get_persona(database, persona_id, user_id=user['user_id'])
+        if persona is None:
+            raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
+        return select_candidates(persona, seed_path)
 
     @router.patch('/{persona_id}', response_model=PersonaResponse,
                   responses={404: {'model': error_model}})

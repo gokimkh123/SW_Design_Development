@@ -33,7 +33,7 @@ def error_response(status: int, code: str, message: str) -> JSONResponse:
 
 
 def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
-               draft_path: Path | None = None) -> FastAPI:
+               draft_path: Path | None = None, seed_path: Path | None = None) -> FastAPI:
     application = FastAPI()
     database = database_path(db_path)
     official = survey_path if survey_path is not None else BACKEND_DIR.parent / 'data' / 'seed' / 'survey.json'
@@ -73,7 +73,9 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
     def survey():
         return load_survey(official, draft)
 
-    application.include_router(create_persona_router(database, official, draft, error_model=ErrorResponse))
+    seeds = seed_path if seed_path is not None else BACKEND_DIR.parent / 'data/seed/personas.json'
+    application.include_router(create_persona_router(database, official, draft,
+                                                     error_model=ErrorResponse, seed_path=seeds))
     return application
 
 
