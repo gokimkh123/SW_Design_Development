@@ -165,4 +165,81 @@ with TemporaryDirectory() as directory:
 .venv/bin/python -m pytest -q
 ```
 
-- 프론트엔드 `realApi`의 생성·조회·수정 경로 및 헤더와 동일하다. 실제 화면 연결은 백엔드 8000 실행 후 `VITE_USE_MOCK=false`로 프론트엔드를 재시작하여 확인한다. 후보·시뮬레이션 등 이후 API는 이번 범위에 포함하지 않으므로 전체 A~C 완주를 의미하지 않는다.
+- 프론트엔드 `realApi`의 생성·조회·수정 경로 및 헤더와 동일하다. 실제 화면 연결은 백엔드 8000 실행 후 `VITE_USE_MOCK=false`로 프론트엔드를 재시작하여 확인한다. 후보 조회는 아래 B1 항목을 참고한다. 시뮬레이션 등 이후 기능까지 포함한 전체 A~C 완주를 의미하지 않는다.
+
+## 후보 추림 API (B1)
+
+- `GET /api/personas/{persona_id}/candidates`: 본인 페르소나와 시드 후보의 생활 성향을 비교하여 상위 최대 3명을 반환한다. 요청 본문은 없고 `X-User-Id` 헤더가 필요하다.
+- `app/persona_api.py`에서 등록 사용자·페르소나 소유자를 확인하고, `app/candidates.py`에서 후보 검증·점수 계산·정렬을 수행한다.
+- 기본 후보 원본은 저장소의 `data/seed/personas.json`이다. 요청마다 파일을 읽으며 `candidate_pool=true`인 시드를 대상으로 한다. 조회 페르소나와 `persona_id` 또는 `user_id`가 같은 시드는 제외한다. 시드 내용을 사용자 DB로 복사하지 않는다.
+
+### 선정 기준 및 현재 범위
+
+사전 점수는 다음 값에 사사오입(half-up)을 적용한 0~100 정수다. 부동소수점 오차와 Python 기본 `round`의 짝수 반올림을 피하도록 정수 연산으로 계산한다.
+
+```text
+100 - Σ(가중치 × |내 축 점수 - 후보 축 점수|)
+```
+
+| 축 | 가중치 |
+| --- | --- |
+| 수면 리듬 (`sleep_rhythm`) | 0.30 |
+| 소음 민감 (`noise_sensitivity`) | 0.25 |
+| 청결 (`cleanliness`) | 0.20 |
+| 사교성 (`sociability`) | 0.15 |
+| 공유 성향 (`sharing_tolerance`) | 0.10 |
+
+- 반올림한 점수 내림차순으로 정렬하며, 동점은 `candidate_id` 문자열 오름차순으로 정렬한다. 후보가 부족하면 존재하는 0~2명만 반환한다.
+- `candidate_id`는 시드의 `persona_id`다. 선정 순서에 따라 `후보 A`, `후보 B`, `후보 C` 별칭을 부여한다. 이름·닉네임·사진·설문 원문은 응답에 포함하지 않는다.
+- `highlight`는 두 사람 사이 차이가 가장 작은 축과 차이 점수를 표시한다. 차이가 같으면 위 표의 축 순서를 따른다.
+- `pre_score`는 후보를 추리기 위한 사전 점수이며 시뮬레이션의 최종 궁합 점수가 아니다. 현재 구현은 시뮬레이션을 실행하거나 조회하지 않아 `simulation`은 항상 `null`이다. 시뮬레이션 저장·조회 구현 시 기존 실행 상태와의 연결이 별도로 필요하다.
+- 필수 시드 정보 누락, 잘못된 축 값, 중복 시드 ID, 파일 손상은 500으로 처리한다. 불완전한 후보를 임의 값으로 채우거나 조용히 제외하지 않는다.
+
+### 응답과 오류
+
+200 응답 형식 예시(설명용 후보 1개, 실제 결과는 최대 3개):
+
+```json
+{
+  "candidates": [
+    {
+      "candidate_id": "per_example",
+      "alias": "후보 A",
+      "department": "예시학과",
+      "year": 1,
+      "type_name": "예시 유형",
+      "pre_score": 90,
+      "highlight": "수면 리듬 차이 10점",
+      "simulation": null
+    }
+  ]
+}
+```
+
+| 상태 | 오류 코드 | 조건 |
+| --- | --- | --- |
+| 401 | `USER_REQUIRED` | 헤더 누락·빈 값·미등록 사용자 |
+| 404 | `PERSONA_NOT_FOUND` | 없는 페르소나 또는 다른 사용자의 페르소나 |
+| 500 | `INTERNAL_ERROR` | 시드 파일 누락·손상·필수 정보 오류 또는 DB 처리 오류 |
+
+오류 본문은 기존 `{ "error": { "code": "...", "message": "..." } }` 형식을 사용한다.
+
+### `/docs`에서 후보 조회 확인
+
+1. 위 실행 명령으로 서버를 켜고 `http://localhost:8000/docs`를 연다.
+2. `POST /api/users`로 사용자를 생성하고 `user_id`를 복사한다. 이미 만든 사용자가 있으면 해당 ID를 사용해도 된다.
+3. 위 페르소나 API 예시대로 `POST /api/personas`에 사용자 헤더와 설문 답변을 보내고 반환된 `persona_id`를 복사한다.
+4. `GET /api/personas/{persona_id}/candidates` → **Try it out**을 누른다. `persona_id`에 3번 값을, `X-User-Id`에 2번 값을 넣고 **Execute**를 누른다.
+5. 200 응답에 최대 3명의 후보, 점수 내림차순, A·B·C 별칭, `simulation: null`이 표시되는지 확인한다.
+6. 사용자 헤더를 비우면 401, 존재하지 않는 페르소나 또는 다른 사용자 헤더로 조회하면 404인지 확인한다.
+
+이 수동 확인 과정의 사용자·페르소나 생성은 서버가 사용하는 개발 DB에 저장된다. 아래 자동 테스트는 임시 DB·시드 파일을 사용하여 실제 개발 데이터를 변경하지 않는다.
+
+후보 API 및 전체 백엔드 검사 (backend 폴더에서):
+
+```bash
+.venv/bin/python -m pytest tests/test_candidates_api.py -q
+.venv/bin/python -m pytest tests -q
+```
+
+테스트는 점수·사사오입, 순위·동점·본인 제외·후보 부족, 응답 필드·개인정보 제외, 사용자·소유권 확인, 시드·DB 데이터 오류를 검증한다. 실제 시드 파일을 임시 위치로 복사하여 사용자 생성 → 페르소나 생성 → 후보 조회 흐름도 검사한다.
