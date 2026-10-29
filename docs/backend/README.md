@@ -56,3 +56,64 @@ backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --port 8000
 - 공식 파일의 JSON·인코딩·구조·선택값이 손상되면 500 반환하며 초안으로 대체하지 않음. 초안도 없거나 손상되면 500
 - 남은 작업: PM의 공식 설문 승인·제공. 선택값 계약 변경 시 프론트엔드·엔진·백엔드 검증 규칙을 함께 검토
 - 테스트는 임시 DB·파일을 사용하며 동시 생성, 강제 ID 충돌, 새 앱·별도 프로세스에서 저장 유지, 파일 우선순위·손상 및 `/docs`·OpenAPI를 검사. 실제 DB는 변경하지 않음
+
+
+## 사용자 · 페르소나 DB
+
+- `app/database.py`의 `initialize_database(path)`가 두 테이블을 준비한다. 반복 실행해도 기존 행을 보존하며, 기존 컬럼·외래키·UNIQUE 구조가 다르면 `SchemaConflictError`로 중단한다. 자동 삭제·재생성·이관은 하지 않는다.
+- 사용자 저장과 페르소나 저장·조회가 지연 초기화를 호출한다. 앱 import, health, 설문 요청만으로 DB를 만들지 않는다. `config.py`의 경로 처리와 우선순위는 그대로 유지한다.
+- 모든 앱 DB 연결은 `connect_database(path)`를 사용한다. 연결마다 `PRAGMA foreign_keys = ON`, 블록 성공 시 커밋, 예외 시 롤백, 마지막에 연결 종료를 수행한다. 초기화 DDL도 하나의 명시적 트랜잭션이다.
+
+| 테이블 | 컬럼과 관계 |
+| --- | --- |
+| users | 기존 `user_id TEXT PRIMARY KEY`, `nickname TEXT NOT NULL`, `created_at TEXT NOT NULL` 유지 |
+| personas | `persona_id TEXT NOT NULL PRIMARY KEY`, `user_id TEXT NOT NULL REFERENCES users(user_id)` |
+| personas 문자열 | `type_name`, `summary`, `conflict_style`, `created_at`: 모두 TEXT NOT NULL |
+| personas JSON | `sleep`, `axes`, `axis_labels`, `preferences`, `must_keep`, `okay_with`: 모두 TEXT NOT NULL, 저장 시 JSON 인코딩 · 조회 시 dict/list 복원 |
+| personas 불리언 | `is_seed INTEGER NOT NULL CHECK (is_seed IN (0, 1))`, 조회 시 bool 복원 |
+
+- PRD의 USER 1:N PERSONA 관계를 따른다. `user_id`에 UNIQUE를 두지 않아 사용자당 여러 페르소나를 허용한다. 삭제 연쇄 처리는 없으며 페르소나가 있는 사용자 삭제는 외래키가 거부한다.
+- 닉네임은 중복 저장하지 않고 `users`와 JOIN하여 현재 값을 반환한다. 닉네임 변경 후 오래된 복사본이 남는 문제를 방지한다. 생성 당시 닉네임 스냅샷은 저장하지 않는다.
+- `sleep`에는 bedtime/wake/exam_pattern, `axes`와 `axis_labels`에는 생활 성향 5개 축, `preferences`에는 temperature를 저장한다. API Persona 모델의 모든 정보를 반환한다.
+- `create_persona(path, user_id, data)`는 기존 사용자 ID를 호출 계층에서 받는다. data는 아래 예시처럼 내용만 전달한다. 저장 계층이 `per_` + 영문 소문자·숫자 8자리 ID와 timezone-aware KST ISO 8601 생성 시각을 부여한다. 기본키 충돌만 최대 10회 재시도하고 소진 시 RuntimeError, 없는 사용자 저장은 SQLite IntegrityError를 전파한다.
+- `get_persona(path, persona_id)`는 닉네임 포함 dict 또는 미존재 시 None을 반환한다. DB·JSON 오류는 숨기지 않는다. 향후 API 계층이 이를 HTTP 응답으로 변환해야 한다. API 경로와 엔진 호출은 이번 구현에 포함하지 않는다.
+
+초기화만 실행 (backend 디렉터리에서, 환경변수는 실행 셸에 설정):
+
+```bash
+.venv/bin/python -c 'from app.config import database_path; from app.database import initialize_database; initialize_database(database_path())'
+```
+
+저장 · 조회 예시 (실제 개발 DB 대신 임시 DB 사용):
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from app.users import create_user
+from app.personas import create_persona, get_persona
+
+with TemporaryDirectory() as directory:
+    path = Path(directory) / 'example.sqlite3'
+    user = create_user(path, '하늘')
+    saved = create_persona(path, user['user_id'], {
+        'type_name': '규칙적인 아침형', 'summary': '조용한 아침을 좋아해요.',
+        'sleep': {'bedtime': '23:00', 'wake': '06:30', 'exam_pattern': 'earlier'},
+        'axes': {'sleep_rhythm': 33, 'noise_sensitivity': 67, 'cleanliness': 84,
+                 'sociability': 33, 'sharing_tolerance': 0},
+        'axis_labels': {'sleep_rhythm': '아침형', 'noise_sensitivity': '예민',
+                        'cleanliness': '높음', 'sociability': '보통', 'sharing_tolerance': '낮음'},
+        'conflict_style': 'direct', 'preferences': {'temperature': 'moderate'},
+        'must_keep': ['밤에는 조용히'], 'okay_with': ['미리 말하고 친구 초대'],
+        'is_seed': False,
+    })
+    assert get_persona(path, saved['persona_id']) == saved
+```
+
+검증 (backend 디렉터리에서):
+
+```bash
+.venv/bin/python -m pytest tests/test_personas_database.py -q
+.venv/bin/python -m pytest tests -q
+```
+
+테스트는 임시 DB만 사용한다. 반복 초기화, 기존 사용자 보존, 1:N 저장, JSON 자료형과 bool 복원, 재연결 후 저장 유지, 매 연결의 외래키, 기본키 중복, ID 충돌 재시도와 소진, 실패 트랜잭션 롤백, 연결 종료, 스키마 충돌 보존, 기존 API 전체를 검사한다. 실제 개발 DB에 테스트 페르소나를 넣지 않는다.
