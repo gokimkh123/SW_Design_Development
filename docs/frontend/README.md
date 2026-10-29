@@ -55,9 +55,11 @@ npm run dev
 ```
 
 - `VITE_USE_MOCK=true`: 임시 설문 · 후보 · 추가 화면 데이터 사용
-- `false`: P0/P1은 문서화된 API 호출. 단, 백엔드 실행 코드 부재로 실연동 미검증
+- `false`: 실 API 호출. 현재 백엔드에서 제공하는 `/api/health`, `POST /api/users`, `GET /api/survey`까지 연동 가능하며, 페르소나 생성 이후 API는 아직 미구현
 - P2 미리보기 · 관리자 데모는 실제 모드에서 비활성
 - 임시 설문 문구 · 선택지는 승인된 시드 데이터로 교체 필요
+
+실연동 확인 시 백엔드를 `localhost:8000`에서 실행하고 `frontend/.env`의 `VITE_USE_MOCK=false`로 설정한 뒤 Vite를 재시작한다. 현재 `main` 배포는 백엔드가 포함되지 않은 mock 빌드이므로 배포 URL은 실 API 검증 대상이 아니다.
 
 ```bash
 npm run typecheck
