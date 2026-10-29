@@ -197,6 +197,7 @@ function App() {
     if (nickname.length < 1 || nickname.length > 10 || busy) return;
     setBusy(true); setError('');
     try {
+      await api.getHealth();
       const user = await api.createUser(nickname);
       setUserId(user.user_id);
       const survey = await api.getSurvey();
@@ -221,7 +222,11 @@ function App() {
       setPersona(result);
       setMustText(result.must_keep.join('\n')); setOkayText(result.okay_with.join('\n'));
       update({ step: 'persona', personaId: result.persona_id });
-    } catch (cause) { setError(errorText(cause)); }
+    } catch (cause) {
+      setError(!isMock && cause instanceof ApiError && cause.status === 404
+        ? '페르소나 생성 API는 아직 준비 중이에요. 설문 응답은 서버에 저장되지 않았어요.'
+        : errorText(cause));
+    }
     finally { setBusy(false); }
   }
 

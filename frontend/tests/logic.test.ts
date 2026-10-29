@@ -91,6 +91,53 @@ test('리포트: null P1 지표를 예측 수치로 꾸미지 않는다', () => 
   assert.equal(conflictsDisplay({ expected_conflicts_per_month: null } as Report), '아직 제공하지 않아요');
 });
 
+test('실 API: health → 사용자 생성 → 설문 조회를 공개 경로로 호출한다', async () => {
+  setUserId(null);
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ path: string; method: string; body: unknown; userId: string | null }> = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({
+      path: String(url), method: init?.method ?? 'GET',
+      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      userId: new Headers(init?.headers).get('X-User-Id'),
+    });
+    const path = String(url);
+    const payload = path === '/api/health' ? { status: 'ok' }
+      : path === '/api/users' ? { user_id: 'usr_new', nickname: '하늘', created_at: '2026-10-29T00:00:00Z' }
+        : provisionalSurvey;
+    return Response.json(payload, { status: path === '/api/users' ? 201 : 200 });
+  };
+  try {
+    assert.deepEqual(await realApi.getHealth(), { status: 'ok' });
+    const user = await realApi.createUser('하늘');
+    setUserId(user.user_id);
+    const survey = await realApi.getSurvey();
+    assert.equal(survey.questions.length, 12);
+    assert.deepEqual(calls.map(({ method, path }) => [method, path]), [
+      ['GET', '/api/health'], ['POST', '/api/users'], ['GET', '/api/survey'],
+    ]);
+    assert.deepEqual(calls[1].body, { nickname: '하늘' });
+    assert.ok(calls.every(({ userId }) => userId === null));
+  } finally {
+    setUserId(null);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('실 API: 백엔드 연결 실패를 안내 가능한 오류로 반환한다', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError('fetch failed'); };
+  try {
+    await assert.rejects(realApi.getHealth(), {
+      status: 0,
+      code: 'NETWORK_ERROR',
+      message: '백엔드에 연결할 수 없어요. 서버 실행 상태를 확인해 주세요.',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('실 SSE: 인증 헤더·Last-Event-ID 재연결·중복 제거', async () => {
   setUserId('usr_test0001');
   const originalFetch = globalThis.fetch;
