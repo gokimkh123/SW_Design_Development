@@ -5,6 +5,8 @@ import { AppShell } from './components/Shell';
 import type { AppTab } from './components/Shell';
 import { areAnswersComplete, isAnswerComplete } from './lib/survey';
 import { isCurrentSimulation, mergeSimulation } from './features/flowState';
+import { simulationStartErrorText } from './lib/simulationError';
+import { withSessionSimulation } from './lib/candidateOverlay';
 import { ComparisonScreen, MemoScreen, RuleProposalScreen, SceneReplayScreen } from './features/P1Screens';
 import { AdminScreen, AxisPreviewEditor, CheckinScreen, DemoMenuScreen, RoomScreen } from './features/P2Screens';
 import './features/flow.css';
@@ -17,6 +19,7 @@ const STORAGE_KEY = 'roommate:p0-flow';
 const EMPTY: Saved = { step: 'start', nickname: '', questionIndex: 0, answers: {} };
 const isMock = import.meta.env.VITE_USE_MOCK === 'true';
 const mockOnlySteps: Step[] = ['room', 'checkin', 'admin', 'more'];
+const unavailableRealSteps: Step[] = ['comparison', 'sceneReplay', 'ruleProposal', 'memo'];
 
 function readSaved(): Saved {
   try {
@@ -25,6 +28,10 @@ function readSaved(): Saved {
     if (!saved || !getUserId()) return EMPTY;
     const restored = { ...EMPTY, ...saved, answers: saved.answers ?? {} };
     if (!isMock && mockOnlySteps.includes(restored.step)) restored.step = restored.matchId ? 'rules' : 'start';
+    if (!isMock && unavailableRealSteps.includes(restored.step)) {
+      restored.step = restored.step === 'ruleProposal' || restored.step === 'memo' ? (restored.matchId ? 'rules' : 'start')
+        : restored.simulationId ? 'report' : restored.personaId ? 'candidates' : 'start';
+    }
     return restored;
   } catch { return EMPTY; }
 }
@@ -162,7 +169,7 @@ function App() {
           try { await refreshCandidates(saved.personaId); }
           catch (cause) { if (active) setError(errorText(cause)); }
         }
-        if ((step === 'simulation' || step === 'report' || step === 'sceneReplay') && saved.simulationId && simulationSnapshot.current?.simulation_id !== saved.simulationId) {
+        if ((step === 'candidates' || step === 'simulation' || step === 'report' || step === 'sceneReplay') && saved.simulationId && simulationSnapshot.current?.simulation_id !== saved.simulationId) {
           const data = await api.getSimulation(saved.simulationId);
           if (active && activeSimulationId.current === saved.simulationId) setSimulation(current => mergeSimulation(current, data));
         }
@@ -183,6 +190,10 @@ function App() {
   }, [step, saved.personaId, saved.simulationId, saved.matchId, refreshCandidates]);
 
   const orderedQuestions = useMemo(() => [...questions.filter(q => q.section === 'life'), ...questions.filter(q => q.section === 'situation')], [questions]);
+  // Candidate cards currently return simulation:null; restore only the selected
+  // run in this session after GET /simulations/{id} confirms its owner and IDs.
+  const visibleCandidates = useMemo(() => withSessionSimulation(candidates, simulation, saved),
+    [candidates, simulation, saved]);
   const question = orderedQuestions[saved.questionIndex];
   const allAnswered = areAnswersComplete(orderedQuestions, saved.answers);
 
@@ -252,15 +263,16 @@ function App() {
   async function selectCandidate(candidate: Candidate) {
     if (!persona || busy) return;
     setBusy(true); setError('');
+    const hasActiveSimulation = !!candidate.simulation && candidate.simulation.status !== 'failed';
     try {
-      const result = candidate.simulation && candidate.simulation.status !== 'failed'
-        ? await api.getSimulation(candidate.simulation.simulation_id)
+      const result = hasActiveSimulation
+        ? await api.getSimulation(candidate.simulation!.simulation_id)
         : await api.startSimulation(persona.persona_id, candidate.candidate_id);
       simulationSnapshot.current = result;
       setSimulation(result); setReport(null); setScenes([]); seenEvents.current.clear(); setDegraded(false); setReplayTargetId(null);
       update({ candidateId: candidate.candidate_id, candidateAlias: candidate.alias, simulationId: result.simulation_id, step: result.status === 'completed' ? 'report' : 'simulation' });
     } catch (cause) {
-      setError(errorText(cause));
+      setError(hasActiveSimulation ? errorText(cause) : simulationStartErrorText(cause, isMock));
       if (supportsReplay(cause)) setReplayTargetId(candidate.candidate_id);
     }
     finally { setBusy(false); }
@@ -276,15 +288,35 @@ function App() {
       setSimulation(result); setReport(null); setScenes([]); seenEvents.current.clear(); setDegraded(false); setReplayTargetId(null);
       const alias = candidates.find(item => item.candidate_id === candidateId)?.alias ?? saved.candidateAlias;
       update({ candidateId, candidateAlias: alias, simulationId: result.simulation_id, step: result.status === 'completed' ? 'report' : 'simulation' });
-    } catch (cause) { setError(errorText(cause)); if (supportsReplay(cause)) setReplayTargetId(candidateId); }
+    } catch (cause) { setError(simulationStartErrorText(cause, isMock)); if (supportsReplay(cause)) setReplayTargetId(candidateId); }
     finally { setBusy(false); }
   }
 
   useEffect(() => {
     if (step !== 'candidates' || !saved.personaId) return;
-    const timer = window.setInterval(() => { void refreshCandidates(saved.personaId!).catch(cause => setError(errorText(cause))); }, 2000);
+    const id = saved.simulationId;
+    const refresh = () => {
+      void refreshCandidates(saved.personaId!).catch(cause => setError(errorText(cause)));
+      if (id && (simulationSnapshot.current?.simulation_id !== id || simulationSnapshot.current.status === 'running' || simulationSnapshot.current.status === 'queued')) {
+        void api.getSimulation(id).then(result => {
+          if (activeStep.current === 'candidates' && activeSimulationId.current === id) {
+            setSimulation(current => mergeSimulation(current, result));
+          }
+        }).catch(cause => {
+          if (activeStep.current !== 'candidates' || activeSimulationId.current !== id) return;
+          if (cause instanceof ApiError && cause.status === 404) {
+            setSimulation(current => current?.simulation_id === id ? null : current);
+            simulationSnapshot.current = null;
+            update({ simulationId: undefined, candidateId: undefined, candidateAlias: undefined });
+            setError('이전 시뮬레이션을 찾을 수 없어 새로 시작할 수 있어요.');
+          } else setError(errorText(cause));
+        });
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 2000);
     return () => window.clearInterval(timer);
-  }, [step, saved.personaId, refreshCandidates]);
+  }, [step, saved.personaId, saved.simulationId, refreshCandidates, update]);
 
   const canSubscribe = Boolean(saved.simulationId && simulation?.simulation_id === saved.simulationId && simulation.status !== 'completed');
   useEffect(() => {
@@ -478,13 +510,13 @@ function App() {
 
     {step === 'candidates' && <div className="flow-screen"><p className="flow-lead">나와 잘 맞을 것 같은 후보를 만났어요</p><p className="flow-muted">매칭 전에는 실명이 공개되지 않아요. 후보별 시뮬레이션을 살펴보세요.</p>
       {loading && !candidates.length && <Notice>후보를 불러오는 중이에요…</Notice>}
-      {candidates.map((candidate, index) => <article className="flow-card flow-candidate" key={candidate.candidate_id}><div className="flow-candidate-head"><span className={`flow-avatar flow-avatar--${index}`}>{candidate.alias.slice(-1)}</span><div><h2>{candidate.alias}</h2><p>{candidate.department} · {candidate.year}학년</p><small>{candidate.type_name}</small></div><div className="flow-candidate-score"><strong>{candidate.simulation?.score ?? candidate.pre_score}</strong><span>{candidate.simulation?.score == null ? '1차 궁합' : '시뮬레이션'}</span></div></div><div className="flow-candidate-highlight">✦ {candidate.highlight}</div><div className="flow-candidate-action"><span className={`flow-status ${candidate.simulation?.status ?? ''}`}>{candidate.simulation ? statusLabel(candidate.simulation.status) : '아직 시작 전'}</span><button type="button" disabled={busy} onClick={() => void selectCandidate(candidate)}>{candidate.simulation?.status === 'completed' ? '리포트 보기' : candidate.simulation?.status === 'failed' ? '다시 시작' : candidate.simulation ? '진행 보기' : '시뮬레이션 시작'} <span aria-hidden="true">→</span></button></div></article>)}
+      {visibleCandidates.map((candidate, index) => <article className="flow-card flow-candidate" key={candidate.candidate_id}><div className="flow-candidate-head"><span className={`flow-avatar flow-avatar--${index}`}>{candidate.alias.slice(-1)}</span><div><h2>{candidate.alias}</h2><p>{candidate.department} · {candidate.year}학년</p><small>{candidate.type_name}</small></div><div className="flow-candidate-score"><strong>{candidate.simulation?.score ?? candidate.pre_score}</strong><span>{candidate.simulation?.score == null ? '1차 궁합' : '시뮬레이션'}</span></div></div><div className="flow-candidate-highlight">✦ {candidate.highlight}</div><div className="flow-candidate-action"><span className={`flow-status ${candidate.simulation?.status ?? ''}`}>{candidate.simulation ? statusLabel(candidate.simulation.status) : '아직 시작 전'}</span><button type="button" disabled={busy} onClick={() => void selectCandidate(candidate)}>{candidate.simulation?.status === 'completed' ? '리포트 보기' : candidate.simulation?.status === 'failed' ? '다시 시작' : candidate.simulation ? '진행 보기' : '시뮬레이션 시작'} <span aria-hidden="true">→</span></button></div></article>)}
       {!loading && candidates.length === 0 && <Notice tone="error">표시할 후보가 없어요. 잠시 후 다시 시도해 주세요.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
       {replayTargetId && <Notice tone="warm">요청 한도 또는 서버 장애가 발생했어요. 잠시 후 다시 시도하거나 서버 리플레이를 요청할 수 있어요. 리플레이 데이터가 없으면 서버가 실시간 모드로 처리할 수 있습니다.</Notice>}
       {replayTargetId && <Button secondary disabled={busy} onClick={() => void retrySimulation('live')}>시뮬레이션 다시 시도</Button>}
       {replayTargetId && <Button disabled={busy} onClick={() => void retrySimulation('replay')}>리플레이로 다시 시작</Button>}
-      <Button secondary disabled={!saved.personaId} onClick={() => update({ step: 'comparison' })}>후보 3명 비교하기</Button>
+      {isMock ? <Button secondary disabled={!saved.personaId} onClick={() => update({ step: 'comparison' })}>후보 3명 비교하기</Button> : <Notice>후보 비교는 아직 준비 중이에요.</Notice>}
       <Button secondary onClick={() => {
         if (!persona) return;
         setError('');
@@ -504,7 +536,7 @@ function App() {
 
     {step === 'report' && <div className="flow-screen"><p className="flow-lead">{report?.candidate.alias ?? activeCandidate?.alias ?? '후보'}와의 궁합 리포트</p><p className="flow-muted">7일 · 20개 장면에서 확인한 생활 궁합</p>
       {loading && !report && <Notice>리포트를 불러오는 중이에요…</Notice>}
-      {report && <><div className="flow-card flow-report-score"><ScoreRing score={report.score} /><div><small>시뮬레이션 궁합 점수</small><h2>{report.headline}</h2><p>실제 생활 결과를 보장하지 않는 참고 점수예요.</p></div></div><div className="flow-card flow-distribution"><h2>7일간의 장면 판정</h2><SceneBars values={report.scene_verdicts} done={20} /><div className="flow-distribution-track">{(['harmonious', 'negotiated', 'conflict', 'pending'] as Verdict[]).map(verdict => <span key={verdict} className={`is-${verdict}`} style={{ width: `${report.verdict_counts[verdict] * 5}%` }} />)}</div><div className="flow-legend">{(['harmonious', 'negotiated', 'conflict', 'pending'] as Verdict[]).map(verdict => <span key={verdict}><i className={`is-${verdict}`} />{verdictLabels[verdict]} {report.verdict_counts[verdict]}</span>)}</div></div><h2 className="flow-section-title">부딪힌 장면과 합의안</h2>{report.highlights.map(item => <div className="flow-card flow-highlight" key={item.scene_index}><span className={`flow-verdict-tag is-${item.verdict}`}>{verdictLabels[item.verdict]}</span><div><small>{item.day}일차 · 장면 {item.scene_index}</small><h3>{item.title}</h3><p>{item.agreement ?? '아직 합의안이 없어요'}</p></div></div>)}<Notice>월 예상 충돌 횟수는 아직 제공하지 않아요. 점수는 시뮬레이션 참고값입니다.</Notice><div className="extra-actions"><Button secondary onClick={() => update({ step: 'sceneReplay' })}>장면별 대화 다시 보기</Button><Button secondary onClick={() => update({ step: 'comparison' })}>후보 3명 비교하기</Button></div><Footer><Button secondary onClick={() => update({ step: 'candidates' })}>다른 후보 보기</Button><Button disabled={busy || simulation?.status !== 'completed'} onClick={() => void requestMatch()}>{busy ? '매칭 신청 중…' : '이 후보에게 매칭 신청'}</Button></Footer></>}
+      {report && <><div className="flow-card flow-report-score"><ScoreRing score={report.score} /><div><small>시뮬레이션 궁합 점수</small><h2>{report.headline}</h2><p>실제 생활 결과를 보장하지 않는 참고 점수예요.</p></div></div><div className="flow-card flow-distribution"><h2>7일간의 장면 판정</h2><SceneBars values={report.scene_verdicts} done={20} /><div className="flow-distribution-track">{(['harmonious', 'negotiated', 'conflict', 'pending'] as Verdict[]).map(verdict => <span key={verdict} className={`is-${verdict}`} style={{ width: `${report.verdict_counts[verdict] * 5}%` }} />)}</div><div className="flow-legend">{(['harmonious', 'negotiated', 'conflict', 'pending'] as Verdict[]).map(verdict => <span key={verdict}><i className={`is-${verdict}`} />{verdictLabels[verdict]} {report.verdict_counts[verdict]}</span>)}</div></div><h2 className="flow-section-title">부딪힌 장면과 합의안</h2>{report.highlights.map(item => <div className="flow-card flow-highlight" key={item.scene_index}><span className={`flow-verdict-tag is-${item.verdict}`}>{verdictLabels[item.verdict]}</span><div><small>{item.day}일차 · 장면 {item.scene_index}</small><h3>{item.title}</h3><p>{item.agreement ?? '아직 합의안이 없어요'}</p></div></div>)}<Notice>월 예상 충돌 횟수는 아직 제공하지 않아요. 점수는 시뮬레이션 참고값입니다.</Notice>{isMock ? <div className="extra-actions"><Button secondary onClick={() => update({ step: 'sceneReplay' })}>장면별 대화 다시 보기</Button><Button secondary onClick={() => update({ step: 'comparison' })}>후보 3명 비교하기</Button></div> : <Notice>장면 다시 보기와 후보 비교는 아직 준비 중이에요.</Notice>}<Footer><Button secondary onClick={() => update({ step: 'candidates' })}>다른 후보 보기</Button><Button disabled={busy || simulation?.status !== 'completed'} onClick={() => void requestMatch()}>{busy ? '매칭 신청 중…' : '이 후보에게 매칭 신청'}</Button></Footer></>}
       {!report && !loading && <><Notice tone="warm">시뮬레이션이 아직 끝나지 않았거나 리포트를 가져오지 못했어요.</Notice><Button secondary onClick={() => void openReport()}>다시 확인</Button></>}
       {error && <Notice tone="error">{error}</Notice>}
     </div>}
@@ -517,7 +549,7 @@ function App() {
     </div>}
 
     {step === 'rules' && <div className="flow-screen"><p className="flow-lead">{match?.room ?? '우리 방'} 생활 규칙</p><p className="flow-muted">7일간의 대화에서 나온 약속을 정리했어요.</p>{loading && !rules && <Notice>생활 규칙을 불러오는 중이에요…</Notice>}
-      {rules && <><div className="flow-card flow-rules">{rules.rules.map((rule, index) => <div className="flow-rule" key={rule.rule_id}><span className="flow-rule-icon">{['☾', '♧', '✦', '▤', '◉', '▣'][index] ?? '•'}</span><div><strong>{rule.area_label}</strong><p>{rule.text}</p><small>출처 · {rule.source.day}일차 장면 {rule.source.scene_index} · {verdictLabels[rule.source.verdict]}</small><button className="extra-inline-link" type="button" onClick={() => update({ ruleId: rule.rule_id, step: 'ruleProposal' })}>수정 제안</button></div></div>)}</div><div className="flow-card flow-agreements"><h2>서로의 동의</h2><div><span>나</span><strong>{rules.agreements.me ? '동의 완료 ✓' : '동의 전'}</strong></div><div><span>룸메이트</span><strong>{rules.agreements.partner ? '동의 완료 ✓' : '동의 전'}</strong></div></div>{rules.status === 'confirmed' ? <Notice>두 사람 모두 동의했어요. 우리 방 생활 규칙이 확정됐습니다.</Notice> : <Notice>규칙은 시뮬레이션을 바탕으로 만든 초안이에요. 내용을 확인한 뒤 동의해 주세요.</Notice>}{rules.status === 'confirmed' && <div className="extra-actions">{isMock && <Button secondary onClick={() => update({ step: 'room' })}>우리 방 시안 미리보기</Button>}<Button secondary onClick={() => update({ step: 'memo' })}>불편 전하기</Button></div>}<Footer><Button disabled={busy || rules.agreements.me || rules.rules.length !== 6} onClick={() => void agree()}>{rules.status === 'confirmed' ? '생활 규칙 확정 완료' : busy ? '동의 처리 중…' : '이 규칙에 동의하기'}</Button></Footer></>}
+      {rules && <><div className="flow-card flow-rules">{rules.rules.map((rule, index) => <div className="flow-rule" key={rule.rule_id}><span className="flow-rule-icon">{['☾', '♧', '✦', '▤', '◉', '▣'][index] ?? '•'}</span><div><strong>{rule.area_label}</strong><p>{rule.text}</p><small>출처 · {rule.source.day}일차 장면 {rule.source.scene_index} · {verdictLabels[rule.source.verdict]}</small>{isMock && <button className="extra-inline-link" type="button" onClick={() => update({ ruleId: rule.rule_id, step: 'ruleProposal' })}>수정 제안</button>}</div></div>)}</div><div className="flow-card flow-agreements"><h2>서로의 동의</h2><div><span>나</span><strong>{rules.agreements.me ? '동의 완료 ✓' : '동의 전'}</strong></div><div><span>룸메이트</span><strong>{rules.agreements.partner ? '동의 완료 ✓' : '동의 전'}</strong></div></div>{rules.status === 'confirmed' ? <Notice>두 사람 모두 동의했어요. 우리 방 생활 규칙이 확정됐습니다.</Notice> : <Notice>규칙은 시뮬레이션을 바탕으로 만든 초안이에요. 내용을 확인한 뒤 동의해 주세요.</Notice>}{rules.status === 'confirmed' && <div className="extra-actions">{isMock && <Button secondary onClick={() => update({ step: 'room' })}>우리 방 시안 미리보기</Button>}{isMock && <Button secondary onClick={() => update({ step: 'memo' })}>불편 전하기</Button>}</div>}<Footer><Button disabled={busy || rules.agreements.me || rules.rules.length !== 6} onClick={() => void agree()}>{rules.status === 'confirmed' ? '생활 규칙 확정 완료' : busy ? '동의 처리 중…' : '이 규칙에 동의하기'}</Button></Footer></>}
       {error && <Notice tone="error">{error}</Notice>}
     </div>}
     {step === 'comparison' && saved.personaId && <ComparisonScreen personaId={saved.personaId} onViewCandidate={candidateId => void viewComparedCandidate(candidateId)} onCandidateSelected={() => setError('')} isMock={isMock} actionError={error} actionBusy={busy} />}
