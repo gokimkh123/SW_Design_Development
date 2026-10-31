@@ -59,7 +59,7 @@ flowchart LR
 
 | 브랜치 | 설정 | 효과 |
 | --- | --- | --- |
-| `main` | PR 필수, 필수 체크 `source branch is develop` · `secret scan`, 강제 push · 삭제 금지 | 직접 push 불가, `develop` 출발 · 비밀 정보 검사 통과 PR만 병합 |
+| `main` | PR 필수, 필수 체크 `source branch is develop` · `secret scan`, 강제 push · 삭제 금지, Ruleset으로 갱신 권한 건한 한정 | 직접 push 불가, `develop` 출발 · 비밀 정보 검사 통과 PR을 건한만 병합 |
 | `develop` | 강제 push · 삭제 금지 | PR · 체크 필수 미적용 (적용 시 자동 병합 불가) |
 | `frontend` · `backend` | 강제 push · 삭제 금지 | 병합 후 자동 삭제 대상에서 제외, 이력 보존 (`git push --force` 대신 `git pull` 후 push) |
 
@@ -139,6 +139,13 @@ flowchart LR
 
 ## 비밀 정보 관리
 
+> **위험도 1순위.** 본 저장소는 공개(public) 저장소이며 GitHub Actions 로그도 누구나 열람 가능. 비밀 정보 유출은 다른 모든 일정 · 기능보다 우선하여 차단한다.
+
+| 보호 대상 | 보관 위치 | 유출 시 영향 |
+| --- | --- | --- |
+| Anthropic API 키 | VM `~/roommate/.env` (GitHub · 저장소 · 이미지 미포함) | 과금 도용 |
+| VM 접속 키 (플랫폼 발급) | 건한 PC, GitHub Environment `production` Secret | VM 장악 (sudo 권한) |
+
 - 원칙: API 키는 팀원에게 배포하지 않음. 로컬 개발은 `ENGINE_IMPL=fake`(가짜 엔진)로 키 없이 진행, 실제 키는 VM `~/roommate/.env`에만 보관
 - 실제 엔진 테스트 필요 시 건한이 사용 한도를 건 개인별 키 발급, 작업 종료 후 폐기
 - `.env` 커밋 금지, [`backend/.env.example`](../../backend/.env.example) 복사 후 사용. PR · 커밋 · 단톡 공지 내 키 기재 금지
@@ -151,11 +158,16 @@ flowchart LR
 | CI `secret scan` ([`scripts/check-secrets.sh`](../../scripts/check-secrets.sh)) | push · PR | 검사 실패 시 `develop` 자동 병합 중단, `main` 대상 PR 실패 표시 |
 | 보호 경로 규칙 ([`auto-merge.yml`](../../.github/workflows/auto-merge.yml)) | 자동 병합 | CI/CD · 보안 · 배포 설정 변경은 자동 병합 중단 → PR로 건한 승인 |
 | Environment `production` | 배포 | VM 접속 정보는 `main` 배포 job에서만 접근 가능 (배포 브랜치 `main` 한정) |
+| Ruleset `main 갱신은 관리자(건한)만` | `main` 반영 | 팀원의 `main` 병합 · push 차단 → 배포 워크플로 변경은 건한 검토 후에만 실행 |
+| 외부 기여자 PR 승인 | fork PR | 외부인 PR의 CI는 건한 승인 후 실행 (Secrets 미전달) |
 | CODEOWNERS | PR | 보호 경로 · API 명세 PR 생성 시 담당 리뷰어 자동 지정 |
 
 - pre-commit hook 활성화(최초 1회, 저장소 루트): `git config core.hooksPath .githooks` (`frontend/`에서 `npm install` 시 자동 설정)
 - 검사 우회(`--no-verify` 등) 금지. 오탐 시 건한에게 문의
-- 키 노출 시 즉시 건한에게 보고 → Console에서 키 폐기 · 재발급 (커밋 삭제만으로는 불충분)
+- 워크플로에서 Secret 값 출력 · 변환 출력(base64 등) 금지: 공개 로그로 즉시 유출
+- 키 노출 시 즉시 건한에게 보고 → 키 폐기 · 재발급 (커밋 삭제만으로는 불충분)
+  - API 키: Anthropic Console에서 폐기 · 재발급 → VM `.env` 교체 → `docker compose up -d backend`
+  - VM 접속 키: Leorca 콘솔 "키 재발급" → GitHub `production`의 `VM_SSH_KEY` 교체
 
 ## 문서 위치
 

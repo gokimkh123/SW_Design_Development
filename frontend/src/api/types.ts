@@ -30,6 +30,7 @@ export interface SurveyQuestion {
 }
 
 export interface Survey { version: string; questions: SurveyQuestion[] }
+export interface Health { status: 'ok' }
 export interface User { user_id: string; nickname: string; created_at: string }
 export type Axes = Record<'sleep_rhythm' | 'noise_sensitivity' | 'cleanliness' | 'sociability' | 'sharing_tolerance', number>;
 
@@ -173,6 +174,7 @@ export type SimulationEvent =
   | { id: string; type: 'error'; data: { code: string; message: string; scene_index?: number; retryable?: boolean } };
 
 export interface ApiClient {
+  getHealth(): Promise<Health>;
   createUser(nickname: string): Promise<User>;
   getSurvey(): Promise<Survey>;
   createPersona(answers: Answers): Promise<Persona>;

@@ -1,6 +1,6 @@
 import type {
   Answers, ApiClient, Candidate, Comparison, Match, Persona, RephraseResult, Report,
-  Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Survey, User,
+  Health, Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Survey, User,
 } from './types';
 
 const USER_KEY = 'roommate.user_id';
@@ -30,11 +30,16 @@ async function request<T>(path: string, method = 'GET', body?: unknown, publicRo
   const headers = new Headers({ Accept: 'application/json' });
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   if (!publicRoute && getUserId()) headers.set('X-User-Id', getUserId()!);
-  const response = await fetch(`/api${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', '백엔드에 연결할 수 없어요. 서버 실행 상태를 확인해 주세요.');
+  }
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
     const error = payload && typeof payload === 'object' && 'error' in payload
@@ -150,6 +155,7 @@ function subscribeSimulation(
 }
 
 export const realApi: ApiClient = {
+  getHealth: () => request<Health>('/health', 'GET', undefined, true),
   createUser: (nickname: string) => request<User>('/users', 'POST', { nickname }, true),
   getSurvey: () => request<Survey>('/survey', 'GET', undefined, true),
   createPersona: (answers: Answers) => request<Persona>('/personas', 'POST', { answers }),

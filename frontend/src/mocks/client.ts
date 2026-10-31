@@ -265,6 +265,7 @@ function ensureRunning(simulation: Simulation): void {
 }
 
 export const mockApi: ApiClient = {
+  async getHealth() { return { status: 'ok' }; },
   async createUser(nickname) {
     if (nickname.trim().length < 1 || nickname.trim().length > 10) throw new ApiError(422, 'VALIDATION_ERROR', '닉네임은 1~10자로 입력해 주세요.');
     currentUserNickname = nickname.trim();

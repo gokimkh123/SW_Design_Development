@@ -173,7 +173,7 @@ flowchart LR
 | 프론트엔드 | React · TypeScript · Vite · Tailwind CSS |
 | 백엔드 | Python · FastAPI · SQLite · SSE |
 | AI 엔진 | Claude API (Haiku 5.5), 모델 교체 가능 구조 |
-| CI/CD | GitHub Actions, Docker (GHCR) → VM 배포 ([배포 안내](docs/common/DEPLOY.md)) |
+| CI/CD | GitHub Actions, Docker (GHCR) → VM 배포 ([배포 안내](docs/common/DEPLOY.md)), 데모: <https://roommate-chan-21.apps.dauai.org> |
 
 ---
 
