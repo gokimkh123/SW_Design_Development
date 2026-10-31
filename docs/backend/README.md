@@ -22,7 +22,8 @@
 | 시뮬레이션 저장 계층 (작업 1) | 입력 고정, 장면 · 이벤트 · 진행률 · 종료 상태 저장 구현 |
 | 시뮬레이션 시작 API · 실행기 (작업 2) | `POST /api/simulations`, 백그라운드 20장면 실행, 점수 저장, 실패 · 종료 · 재시작 처리 구현 |
 | 상태 조회 · SSE (작업 3) | 저장 상태 조회, 이벤트 전달 · 재연결 · 연결 정리 구현 |
-| 완료 리포트 (작업 4) · 매칭 · 규칙 API | 후속 구현 범위 |
+| 완료 리포트 (작업 4) | 저장 결과 기반 조회·접근 제어·무결성 검사 구현 |
+| 매칭 · 규칙 API | 후속 구현 범위 |
 | 실제 엔진 통합 · replay 재생 | 실제 엔진 검증 및 replay 데이터 계약 · 연결 필요 |
 
 시뮬레이션 작업 1~4(기존 범찬 담당 연결 · 리포트 부분 포함)는 일준이 진행한다. 위 분담 표는 10/28 협의 기록이며, 현재 시뮬레이션 담당 범위는 이 설명을 따른다. 후보 카드의 `simulation`은 아직 `null`이며 프론트엔드 연결은 후속 작업이다.
@@ -260,7 +261,7 @@ with TemporaryDirectory() as directory:
 
 ## 시뮬레이션 저장 구조 · 실행기 연결 (작업 1)
 
-`app/simulations.py`는 실행기·시작 API·상태 조회·SSE·완료 리포트가 공유할 저장 계층이다. 작업 1은 SQLite 저장과 조회를 제공하며 작업 2에서 시작 API와 실행기를 연결했다(아래 작업 2 절 참고). SSE 전송은 작업 3에서 연결했으며 리포트 조립은 아직 연결하지 않았다. 기존 후보 API의 `simulation: null`도 그대로다. 작업 1~4는 기존 범찬 담당 연결·리포트 부분을 포함하여 일준이 진행하며, 위 분담 표는 10/28 당시 협의 기록이다.
+`app/simulations.py`는 실행기·시작 API·상태 조회·SSE·완료 리포트가 공유할 저장 계층이다. 작업 1은 SQLite 저장과 조회를 제공하며 작업 2에서 시작 API와 실행기를 연결했다(아래 작업 2 절 참고). SSE 전송은 작업 3, 완료 리포트 조립은 작업 4에서 연결했다. 기존 후보 API의 `simulation: null`도 그대로다. 작업 1~4는 기존 범찬 담당 연결·리포트 부분을 포함하여 일준이 진행하며, 위 분담 표는 10/28 당시 협의 기록이다.
 
 ### 테이블 관계와 기존 DB 보존
 
@@ -304,7 +305,7 @@ with TemporaryDirectory() as directory:
 | `list_events(path, id, after_event_id=None, user_id=...)` | 전역 sequence 순 공개 이벤트 목록. ID 미지정은 전체, 지정하면 해당 ID **이후**. 해당 실행에 없는 ID는 ValueError, 마지막 ID 이후는 빈 목록 |
 | `get_completion(path, id, user_id=...)` | 저장된 `{score, headline, verdict_counts, report}`. 미완료는 StorageConflictError. report는 아직 계산하지 않았다면 null |
 
-완료 함수의 `report`에는 후속 리포트 계층이 API Report 형식으로 만든 공개 데이터만 전달한다. 저장 함수는 그 리포트를 계산하거나 Report 스키마 전체를 검증하지 않는다. 후속 계층에서 simulation_id, score, verdict_counts 등의 일치를 검증해야 한다.
+완료 함수의 선택적 `report`는 기존 저장 계약으로 보존한다. 작업 4의 조회 API는 이 비검증 dict를 공개하지 않고, 저장된 최종 score·headline·verdict_counts와 장면·후보 스냅샷에서 Report를 구성한다. 기존 실행기의 `report: null` 결과도 조회할 수 있다.
 
 ### 재사용 · 상태 전이 · 순서
 
@@ -380,7 +381,7 @@ PY
 
 ## 시뮬레이션 시작 API · 실행기 (작업 2)
 
-작업 1~4는 기존 범찬 담당 연결 부분까지 일준이 진행한다. 작업 2는 `POST /api/simulations`와 `app/simulation_runner.py`를 연결한다. 작업 2 자체는 시작·실행만 담당하며 상태 조회·SSE는 아래 작업 3에서 연결한다. 리포트·매칭·규칙 API와 프론트엔드는 후속 범위다. 후보 카드의 `simulation: null`도 유지한다.
+작업 1~4는 기존 범찬 담당 연결 부분까지 일준이 진행한다. 작업 2는 `POST /api/simulations`와 `app/simulation_runner.py`를 연결한다. 작업 2 자체는 시작·실행만 담당하며 상태 조회·SSE는 아래 작업 3에서 연결한다. 완료 리포트는 아래 작업 4에서 제공하며 매칭·규칙 API와 프론트엔드는 후속 범위다. 후보 카드의 `simulation: null`도 유지한다.
 
 - 요청: `X-User-Id` 헤더와 `{"persona_id":"...","candidate_id":"...","mode":"live"}`. mode 생략 시 live. 등록 사용자와 본인 페르소나를 확인하고 기존 `select_candidates` 상위 3명만 허용한다. 헤더 누락/미등록은 401 USER_REQUIRED, 비소유/없는 페르소나/선택 불가 후보는 404 PERSONA_NOT_FOUND, 잘못된 JSON·필드·mode는 422 VALIDATION_ERROR다.
 - 신규는 202 + 공통 Simulation 모델, 동일 페르소나·후보·실제 모드의 running/completed는 200 + 기존 모델. `BEGIN IMMEDIATE`와 기존 부분 UNIQUE 인덱스가 중복 예약을 막고, created=true일 때만 task를 등록한다. 응답은 전체 엔진 실행을 기다리지 않는다. failed는 새 ID로 다시 요청할 수 있다.
@@ -487,3 +488,40 @@ backend 디렉터리에서:
 ```
 
 임시 DB와 가짜/제어 가능한 엔진으로 조회 상태·진행률·무변경, 접근 제어, 프레임·순서·ID·재연결·잘못된 커서, 페이지/대기 경계 누락, 완료/실패·종료 후 접속, 후보 실명·내부 오류 비노출, 앱 재시작·복구를 검사한다. 실제 HTTP 테스트는 OS가 할당한 루프백 임시 포트의 uvicorn과 httpx 스트림으로 **실행 종료 전에 첫 프레임 수신**, 새 이벤트 전달, 두 구독의 독립 수신, 연결 종료 후 generator 정리·실행기 유지, heartbeat 비저장을 확인한다. 비동기 테스트는 시간 제한과 finally 정리를 사용한다. 로컬 포트 바인딩이 차단된 환경에서는 권한 허용이 필요하며 이 검사를 생략한 채 실시간 전달 검증을 완료했다고 판단하면 안 된다. 유료 LLM과 실제 개발 DB는 사용하지 않는다.
+
+
+## 시뮬레이션 완료 리포트 (작업 4)
+
+`GET /api/simulations/{simulation_id}/report`에 등록 사용자의 `X-User-Id`를 전달한다. 시작 응답의 simulation_id로 상태를 조회하여 completed를 확인한 뒤 호출한다. `/docs`에서도 같은 헤더와 ID로 실행할 수 있다.
+
+```bash
+curl -H 'X-User-Id: usr_발급받은ID' \
+  http://localhost:8000/api/simulations/sim_발급받은ID/report
+```
+
+200 응답은 [API Report 명세](../common/API.md#report)를 따른다.
+
+- `candidate`: 실행 당시 후보 ID·별칭·유형명만 반환한다. 현재 후보 순위·시드 파일·페르소나 수정에 영향을 받지 않는다.
+- `score`와 `headline`: 기존 실행기가 엔진의 score/headline을 호출하고 `complete_simulation`으로 저장한 최종 값을 그대로 사용한다. 후보 추림의 `pre_score`와 다르며 조회 시 재계산하지 않는다.
+- `scene_verdicts`: 저장된 장면 순서 20개. `verdict_counts`는 harmonious/negotiated/conflict/pending 네 항목이며 장면 집계와 저장된 완료 집계의 일치를 검사한다. pending은 유효한 판정 보류이며 누락된 판정을 pending으로 대체하지 않는다.
+- `highlights`: 모든 conflict 장면 다음에 negotiated 장면을 배치하며, 같은 판정은 scene_index 오름차순이다. 장면 번호·일차·제목과 저장된 agreement만 반환한다. 합의안이 null이면 그대로 유지한다.
+- `expected_conflicts_per_month`: 산식 미확정으로 항상 null이다.
+- 원본 입력, 후보 실명·사용자 ID, 내부 모드, 대화·판정 근거, 실패 상세, 선택적 result.report는 공개하지 않는다. 자유 문구의 알려진 후보 이름은 실행 당시 별칭으로 치환한다.
+
+| HTTP | 오류 코드 | 조건 |
+| --- | --- | --- |
+| 401 | USER_REQUIRED | 사용자 헤더 누락 또는 미등록 사용자 |
+| 404 | SIMULATION_NOT_FOUND | 실행 미존재 또는 다른 사용자 소유 |
+| 409 | SIMULATION_NOT_COMPLETED | queued, running, failed 모두 포함 |
+| 500 | INTERNAL_ERROR | 완료 결과 JSON·필수 필드·자료형 손상, 20개 장면 누락, 장면 ID/순서 불일치, 집계 불일치, DB 오류 |
+
+`app/simulation_report.py`는 상태·완료 결과·장면을 하나의 읽기 트랜잭션에서 조회하고 엄격한 공개 모델로 검증한다. 조회 중 엔진/LLM 호출, 실행 재시작, 완료 재저장, DB 이관은 없다. 기존 점수·저장 함수, 시작 API·상태 조회·SSE의 동작과 스키마를 보존한다. 손상된 완료 결과는 복구하거나 임의의 점수·합의안을 생성하지 않는다. 내부 저장 계층의 단축 시연 결과는 보존하지만, 공개 리포트는 명세에 따라 20장면 완료 결과만 지원한다. 익명화는 저장 스냅샷에 알려진 이름의 치환이며 임의의 자유 문구에서 모든 개인정보를 탐지하는 기능은 아니다.
+
+검증 (backend 디렉터리, 임시 DB와 가짜 엔진만 사용):
+
+```bash
+ENGINE_IMPL=fake .venv/bin/python -m pytest tests/test_simulation_report.py -q
+ENGINE_IMPL=fake .venv/bin/python -m pytest tests -q
+```
+
+전용 테스트는 정상 응답·사용자/소유권·모든 상태·손상 결과·점수·집계·순서·null 합의안·개인정보 비노출·반복 조회의 DB 바이트 무변경을 검사한다. 사용자 생성 → 페르소나 생성 → 후보 조회 → 시뮬레이션 시작 → 20장면 완료 → 리포트 조회 통합 흐름도 가짜 엔진으로 검증한다. 실제 사용자 DB와 유료 LLM은 사용하지 않는다. 실제 엔진 통합, replay 재생, 후보 카드의 simulation 연결, 매칭·생활 규칙·프론트엔드는 이번 변경 범위에서 제외한다.
