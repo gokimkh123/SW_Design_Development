@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import { areAnswersComplete, isAnswerComplete } from '../src/lib/survey';
 import { applySimulationEvent, initialStreamState, latestCandidateSimulation } from '../src/lib/simulation';
 import { conflictsDisplay, verdictLabel } from '../src/lib/report';
-import { parseSseBlock, realApi, setUserId } from '../src/api/real';
+import { ApiError, parseSseBlock, realApi, setUserId } from '../src/api/real';
+import { simulationStartErrorText } from '../src/lib/simulationError';
+import { withSessionSimulation } from '../src/lib/candidateOverlay';
 import { mockApi } from '../src/mocks/client';
 import { provisionalSurvey } from '../src/mocks/survey';
 import { isCurrentSimulation, mergeSimulation } from '../src/features/flowState';
 import { previewAdmin, previewCheckin, previewRoom } from '../src/mocks/preview';
-import type { Answers, Report, Simulation, SimulationEvent } from '../src/api/types';
+import type { Answers, Candidate, Report, Simulation, SimulationEvent } from '../src/api/types';
 
 test('후보 상태: 실패 후 새 완료 시뮬레이션이 이전 실패를 대체한다', () => {
   const base = {
@@ -23,6 +25,35 @@ test('후보 상태: 실패 후 새 완료 시뮬레이션이 이전 실패를 �
   };
   assert.equal(latestCandidateSimulation([failed, completed], 'per_me', 'per_a')?.simulation_id, 'sim_retry');
   assert.equal(latestCandidateSimulation([failed, completed], 'per_me', 'per_b'), undefined);
+});
+
+test('시뮬레이션 시작: 경로 404만 준비 중으로 안내하고 자원 오류는 보존한다', () => {
+  const missingRoute = new ApiError(404, 'VALIDATION_ERROR', '요청 경로, 메서드 또는 형식을 확인해 주세요.');
+  assert.match(simulationStartErrorText(missingRoute, false), /준비 중/);
+  assert.equal(simulationStartErrorText(missingRoute, true), missingRoute.message);
+  const missingPersona = new ApiError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.');
+  assert.equal(simulationStartErrorText(missingPersona, false), missingPersona.message);
+  const unavailable = new ApiError(503, 'LLM_UNAVAILABLE', 'AI 연결에 실패했어요.');
+  assert.equal(simulationStartErrorText(unavailable, false), unavailable.message);
+});
+
+test('후보 카드: 확인된 세션 실행만 null 후보 상태에 덧씌운다', () => {
+  const candidates: Candidate[] = ['per_a', 'per_b'].map(candidate_id => ({
+    candidate_id, alias: '후보 A', department: '학과', year: 1, type_name: '유형',
+    pre_score: 80, highlight: '특징', simulation: null,
+  }));
+  const simulation: Simulation = {
+    simulation_id: 'sim_a', persona_id: 'per_me', candidate_id: 'per_a', mode: 'live',
+    status: 'completed', progress: { done: 20, total: 20 },
+    verdict_counts: { harmonious: 20, negotiated: 0, conflict: 0, pending: 0 },
+    score: 88, started_at: '2026-11-03T10:00:00+09:00', completed_at: '2026-11-03T10:05:00+09:00',
+  };
+  const overlaid = withSessionSimulation(candidates, simulation, { personaId: 'per_me', simulationId: 'sim_a' });
+  assert.equal(overlaid[0].simulation?.status, 'completed');
+  assert.equal(overlaid[0].simulation?.score, 88);
+  assert.strictEqual(overlaid[1], candidates[1]);
+  assert.strictEqual(withSessionSimulation(candidates, simulation, { personaId: 'other', simulationId: 'sim_a' })[0], candidates[0]);
+  assert.strictEqual(withSessionSimulation(candidates, simulation, { personaId: 'per_me' })[0], candidates[0]);
 });
 
 test('B2 상태: 늦은 REST 응답이 SSE 완료·진행률을 되돌리지 않는다', () => {

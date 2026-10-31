@@ -1,16 +1,18 @@
 # 프론트엔드 ↔ 백엔드 연동 인수인계
 
-> **상태: 협의용, 미승인.** [API 명세서](../common/API.md)는 v1.0 초안이며 백엔드 실행 코드와 확정 시드 데이터는 아직 저장소에 없다. 이 문서는 프론트엔드 mock을 실데이터로 교체할 때 필요한 계약·검증 자료를 요청한다. **새 엔드포인트나 응답 형식을 확정하지 않는다.** 계약이 합의되면 `docs/common/API.md`를 먼저 수정하고 동현과 백엔드 담당자의 리뷰를 받는다.
+> **상태: 협의용, 미승인.** [API 명세서](../common/API.md)는 v1.0 초안이다. 백엔드에 P0 경로(시뮬레이션 시작·상태·SSE·리포트, 매칭·규칙 포함)가 구현됐지만, 프론트엔드의 A1→C2 실서버 완주는 아직 검증하지 않았다. 확정 설문·장면·리플레이 데이터와 실제 엔진도 준비되지 않았다. **새 엔드포인트나 응답 형식을 확정하지 않는다.** 계약이 합의되면 `docs/common/API.md`를 먼저 수정하고 양쪽 담당자의 리뷰를 받는다.
 
 ## 1. 전달 범위와 우선순위
 
 | 우선 | 범위 | 현재 프론트엔드 처리 | 백엔드/데이터 인계물 |
 | --- | --- | --- | --- |
-| P0 | A1–A4, B1–B3, C1–C2 | 9개 화면과 명세 기반 mock 경로 구현. 실 API 미검증 | 아래 기존 P0 응답, SSE·오류 사례, 확정 설문/시드/장면 데이터 |
+| P0 | A1–A4, B1–B3, C1–C2 | 9개 화면과 실 API 호출 경로 구현. A1→C2 실서버 완주는 미검증 | 후보 상태 복원 계약, 오류·재연결 사례, 확정 설문/시드/장면 데이터 |
 | P1 | B3 대화 다시 보기, B4 비교, C3 규칙 중재, D2 불편 전하기 | 추가 화면은 mock-first; 실 응답과 분리 | API 명세서 4.16의 5개 경로 확인, 누락된 전송/상태 계약 결정 |
 | P2 | A4 5축 직접 수정, C3 시험 기간 자동 적용, D1 우리 방, D3 체크인, D4 관리자 | 시안 미리보기 데이터만 사용; 실 기능·관리자 권한으로 표시 금지 | 축 수정/재계산·학사 일정·화면별 조회/저장 스키마, 권한·개인정보 정책 합의 후 API 문서화 |
 
 근거: [P0 구현 계획](../frontend/PLAN.md), [PRD 화면 범위](../common/PRD.md#62-화면별-범위), [기획서 PDF](../common/룸메궁합_서비스기획서_v1.0.pdf) 5–8쪽. P1/P2 선행 UI는 P0 실연동 완료를 뜻하지 않는다.
+
+현재 백엔드는 P1의 장면 다시 보기·후보 비교·규칙 제안/수락·불편 문장 변환 경로와 P2의 실제 조회/저장·관리자 인가를 제공하지 않는다. 프론트엔드는 실 모드에서 P1 진입을 제한하거나 준비 중으로 안내하고, P2 미리보기를 비활성화한다. P1 시안은 mock 모드에서만 체험할 수 있다.
 
 ## 2. 기존 문서 계약 — 실서버와 대조 필요
 
@@ -22,7 +24,7 @@
 | --- | --- | --- |
 | A1–A3 | `POST /api/users`, `GET /api/survey` | `user_id`; **q01–q12 전체**(`life` 8, `situation` 4), `question_id`·`type`·`section`·`title`, 시간 문항 `fields`, 선택 문항 `options[].value/label`. 화면은 서버 순서와 `value`를 그대로 사용. |
 | A4 | `POST /api/personas`, `GET/PATCH /api/personas/{id}` | `persona_id`·`nickname`·`type_name`·`summary`·5개 `axes`와 `axis_labels`·`must_keep`·`okay_with`. 두 목록은 각 3개/항목 30자 이내. |
-| B1–B2 | `GET /api/personas/{id}/candidates`, `POST /api/simulations`, `GET /api/simulations/{id}`, `GET /api/simulations/{id}/events` | 익명 후보 A/B/C 3명(`candidate_id`·`alias`·학과·학년·유형·1차 점수·후보별 `simulation`), 시뮬레이션 ID·`queued/running/completed/failed`·`progress.done/total`·점수·6종 SSE 이벤트. 매칭 전 실명·사진 금지. |
+| B1–B2 | `GET /api/personas/{id}/candidates`, `POST /api/simulations`, `GET /api/simulations/{id}`, `GET /api/simulations/{id}/events` | 익명 후보 A/B/C 3명과 시뮬레이션 상태·6종 SSE 이벤트. 현재 후보 응답의 `simulation`은 항상 `null`이므로 서버 기반 재방문 상태 복원은 불가능하다. 매칭 전 실명·사진 금지. |
 | B3 | `GET /api/simulations/{id}/report` | 완료 후 점수·한 줄 판정·20개 `scene_verdicts`·판정 수·충돌/조율 `highlights`와 합의안. 완료 전 `409`; P1 `expected_conflicts_per_month`는 산식 확정 전 `null`. |
 | C1–C2 | `POST /api/matches`, `GET /api/matches/{id}`, `GET /api/matches/{id}/rules`, `POST /api/matches/{id}/rules/agree` | 완료된 `simulation_id`만 신청 가능. `accepted` 후에만 `partner.name` 공개. 규칙 6개 영역·각 `source`·양측 동의 상태, 최종 `confirmed`. |
 
@@ -58,8 +60,8 @@ P2의 실제 데이터·권한 정책은 [PRD FR-A6](../common/PRD.md#71-흐름-
 
 | 결정 항목 | 현재 차이/공백 | 결정 담당(문서 제안) |
 | --- | --- | --- |
-| 설문·시드·장면 | `data/seed/survey.json` · 20장면 확정 파일 없음. 시드 인물 11명은 `data/seed/personas.json` 초안(#33). API 예시는 설문 3문항 발췌뿐 | 건한: q01–q12 문구·`value`, 후보 10명·리플레이 3건, 장면 20개 확정. 일준: 실제 `GET /survey` 반영 |
-| SSE 사용자 식별 | 공통 `X-User-Id` 필수 vs `EventSource` 예시에는 헤더 없음. 프론트엔드는 현재 fetch 스트림에서 헤더를 보냄 | 일준: SSE 인증·재연결 시 `Last-Event-ID` 계약 확정 |
+| 설문·시드·장면 | `data/seed/survey.json` · 확정 20장면 파일 없음. `data/seed/personas.json`은 존재하며 개발용 가짜 엔진에 장면 내장. 리플레이 파일 없음 | 건한·일준: 설문 문구·선택값, 후보·장면·리플레이 확정 자료 인계 |
+| SSE 사용자 식별 | 프론트엔드는 fetch 스트림에서 `X-User-Id`와 재연결 시 `Last-Event-ID`를 보내며, 백엔드는 두 헤더를 처리함 | 실 브라우저에서 끊김·중복·재연결을 함께 검증 |
 | 시뮬레이션 `mode` | (10/28 확정) 요청 · 응답 값은 `live` · `replay`, `live` 실행 방식은 서버 `SIM_MODE`(`agents` · `single`)로 결정 ([API 명세서 7장](../common/API.md#7-엔진-인터페이스)). 프론트엔드 현행 구현과 일치 | 조치 불필요 |
 | 후보 시작 시점 | PRD의 3명 병렬 자동 실행 vs API 예시의 후보별 POST. 현재 프론트엔드는 후보 선택 시 시작 | 일준·범찬·동현: 자동 시작 여부·동시 요청 수·idempotency 확정 |
 | P1/P2 미정 항목 | 월 예상 갈등 산식, D2 실제 전송, C3 거절/재제안·시험 기간 자동 적용, A4 축 직접 수정, D1/D3 API, D4 권한 | 건한(제품/산식), 일준·범찬(계약/권한), 동현(UI 상태) 공동 합의 |
@@ -68,11 +70,11 @@ P2의 실제 데이터·권한 정책은 [PRD FR-A6](../common/PRD.md#71-흐름-
 
 ## 5. 백엔드 전달용 검증 fixture·인수 조건
 
-실 서버 준비 시 **민감한 실제 사용자 데이터 대신** 재현 가능한 시드 ID와 테스트 응답을 제공해 달라. 테스트 데이터는 다음 상태를 구분해야 한다.
+실서버 화면 검증에는 **민감한 실제 사용자 데이터 대신** 재현 가능한 시드 ID와 테스트 응답을 사용한다. 테스트 데이터는 다음 상태를 구분해야 한다.
 
 1. **정상:** 설문 12문항(8+4), 1명 페르소나, 익명 후보 3명, 각 후보 20장면 SSE/완료 리포트, `accepted` 매칭, 출처 포함 규칙 6개, 동의 후 `confirmed`.
 2. **진행/경계:** 후보별 `null`·`queued`·`running`·`completed`·`failed`, 미완료 리포트 `409`, 장면 `pending`, P1 월 예상값 `null`, 시드 리플레이 존재/부재.
 3. **오류/복구:** 사용자 헤더 누락 `401`, 설문 누락 `400`, 형식 오류 `422`, LLM 한도 `429`, LLM 장애 `503`, SSE 중복 ID·연결 끊김·`Last-Event-ID` 재전송, 2초 상태 폴링 완료. 폴링 응답은 대화 전문이 아니라 상태·진행률만 포함.
 4. **P1/P2 안전:** 동일 사용자가 속한 서로 다른 매칭 2건의 규칙에 서로 다른 전역 고유 `rule_id`를 부여하고, 제안·수락에서 대상 규칙만 변경되는지 확인. 다른 사용자의 매칭 규칙 접근은 소유권 검증으로 거부. ID 재사용이 필요하면 `match_id`를 포함하는 별도 매칭 범위 API 합의 후 재검증. 매칭 전 실명 없음, D2 원문 미저장/상대 미전달 및 지원하지 않는 주제의 명시적 오류, C3 중재 근거 2개, D4 일반 사용자 접근 거부 및 집계 응답에 대화·메모·실명 없음.
 
-**인수 완료 기준:** 담당자가 위 충돌/공백을 결정해 `docs/common/API.md`와 시드 파일에 반영 → 프론트엔드 `VITE_USE_MOCK=false`에서 A1→C2 및 준비된 P1 경로 완주 → 오류/복구와 390×844 화면 확인 → 양쪽 담당자 리뷰. 백엔드가 없는 동안 mock 완주는 실연동 검증으로 기록하지 않는다.
+**인수 완료 기준:** 담당자가 위 충돌/공백을 결정해 `docs/common/API.md`와 시드 파일에 반영 → 프론트엔드 `VITE_USE_MOCK=false`에서 A1→C2 및 준비된 P1 경로 완주 → 오류/복구와 390×844 화면 확인 → 양쪽 담당자 리뷰. 백엔드 단위 테스트 통과나 mock 완주는 실연동 검증으로 기록하지 않는다.
