@@ -3,6 +3,15 @@
 - `main` 반영 시 [CD 워크플로](../../.github/workflows/cd.yml)가 Docker 이미지를 빌드하여 GHCR에 업로드하고, VM에서 `docker compose`로 재기동한다.
 - API 키는 VM의 `~/roommate/.env`에만 둔다. GitHub · 이미지 · 저장소에는 포함하지 않는다.
 
+## 현재 운영 환경 (10/31)
+
+| 항목 | 내용 |
+| --- | --- |
+| 플랫폼 | 레오르카 클러스터(Leorca) VM, Ubuntu 24.04, 2 vCPU · 4GB |
+| 웹 주소 | <https://roommate-chan-21.apps.dauai.org> (Leorca 콘솔 VM 상세 → 웹 → 포트 `80` 공개) |
+| 런타임 | Docker 29.9, Compose v5.6 (10/29 설치) |
+| SSH | 플랫폼 SSH 게이트웨이 경유. 접속 정보는 GitHub Environment `production` Secrets에만 등록, 공개 문서 기재 금지 |
+
 ## 구성
 
 ```mermaid
@@ -34,8 +43,8 @@ flowchart LR
 
 1. Docker Engine 및 Compose 플러그인 v2.24 이상 설치 (`docker compose version`으로 확인, `env_file`의 `required: false` 지원 버전)
 2. 배포 계정을 `docker` 그룹에 추가: `sudo usermod -aG docker <계정>` 후 재접속
-3. 배포 전용 SSH 키 생성 (로컬, 저장소 폴더 밖): `ssh-keygen -t ed25519 -f ~/.ssh/roommate_deploy -N ""`
-4. 공개키(`roommate_deploy.pub`)를 VM 배포 계정의 `~/.ssh/authorized_keys`에 추가
+3. 배포용 SSH 키 준비: Leorca는 게이트웨이가 플랫폼 발급 키로 인증하므로 발급 키를 그대로 사용 (별도 키 생성 · `authorized_keys` 수정 불필요, 키 재발급 시 `VM_SSH_KEY` 교체)
+4. (일반 VM인 경우) 배포 전용 키 생성 `ssh-keygen -t ed25519 -f ~/.ssh/roommate_deploy -N ""` 후 공개키를 VM `~/.ssh/authorized_keys`에 추가
 5. VM에 `~/roommate/.env` 작성 (커밋 금지)
 
 ```bash
