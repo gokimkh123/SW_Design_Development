@@ -1,5 +1,5 @@
 # 기능: 소유자와 선정 후보를 검증하고 시뮬레이션 시작을 예약한다.
-# 시스템 범위: POST 시작 API만 제공하며 조회·SSE·리포트 API는 제외한다.
+# 시스템 범위: 시작·상태 조회·저장 이벤트 SSE를 제공하며 리포트 API는 제외한다.
 # 결과: 신규 실행은 202, 기존 실행은 200 또는 공통 오류 형식을 반환한다.
 # 한계
 # 1. 리플레이 데이터와 파일 형식 계약이 없어 실제 replay 재생은 아직 구현하지 않았다.
@@ -10,6 +10,8 @@ import json
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Response
+from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.candidates import select_candidates
@@ -18,6 +20,7 @@ from app.persona_api import PersonaAPIError
 from app.personas import get_persona
 from app.users import get_user
 from app import simulations as store
+from app.simulation_stream import stream_events
 
 
 class SimulationCreate(BaseModel):
@@ -42,6 +45,34 @@ class SimulationResponse(BaseModel):
 
 def create_simulation_router(database, seeds, runner, replay_path, error_model):
     router = APIRouter(prefix='/api/simulations', tags=['simulations'])
+
+    def owned(simulation_id, x_user_id):
+        if not x_user_id or get_user(database, x_user_id) is None:
+            raise PersonaAPIError(401, 'USER_REQUIRED', '등록된 사용자 ID를 보내 주세요.')
+        sim = store.get_simulation(database, simulation_id, user_id=x_user_id)
+        if sim is None:
+            raise PersonaAPIError(404, 'SIMULATION_NOT_FOUND', '시뮬레이션을 찾을 수 없어요.')
+        return sim
+
+    errors = {status: {'model': error_model} for status in (401, 404, 422, 500)}
+
+    @router.get('/{simulation_id}', response_model=SimulationResponse, responses=errors)
+    def status(simulation_id: str, x_user_id: Annotated[str | None, Header()] = None):
+        return owned(simulation_id, x_user_id)
+
+    @router.get('/{simulation_id}/events', response_class=StreamingResponse,
+                responses={200: {'content': {'text/event-stream': {}}}, **errors})
+    async def events(simulation_id: str,
+                     x_user_id: Annotated[str | None, Header()] = None,
+                     last_event_id: Annotated[str | None, Header()] = None):
+        await run_in_threadpool(owned, simulation_id, x_user_id)
+        try:
+            batch = await run_in_threadpool(store.read_event_batch, database, simulation_id,
+                user_id=x_user_id, after_event_id=last_event_id)
+        except ValueError:
+            raise PersonaAPIError(422, 'VALIDATION_ERROR', '이 실행에 저장된 Last-Event-ID를 보내 주세요.')
+        return StreamingResponse(stream_events(database, simulation_id, x_user_id, last_event_id, batch),
+            media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
     @router.post('', status_code=202, response_model=SimulationResponse,
                  responses={200: {'model': SimulationResponse}, **{
