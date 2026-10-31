@@ -21,7 +21,8 @@
 | 사용자 · 설문 · 페르소나 · 후보 추림 API | 구현 완료 |
 | 시뮬레이션 저장 계층 (작업 1) | 입력 고정, 장면 · 이벤트 · 진행률 · 종료 상태 저장 구현 |
 | 시뮬레이션 시작 API · 실행기 (작업 2) | `POST /api/simulations`, 백그라운드 20장면 실행, 점수 저장, 실패 · 종료 · 재시작 처리 구현 |
-| 상태 조회 · SSE · 리포트 · 매칭 · 규칙 API | 후속 구현 범위 |
+| 상태 조회 · SSE (작업 3) | 저장 상태 조회, 이벤트 전달 · 재연결 · 연결 정리 구현 |
+| 완료 리포트 (작업 4) · 매칭 · 규칙 API | 후속 구현 범위 |
 | 실제 엔진 통합 · replay 재생 | 실제 엔진 검증 및 replay 데이터 계약 · 연결 필요 |
 
 시뮬레이션 작업 1~4(기존 범찬 담당 연결 · 리포트 부분 포함)는 일준이 진행한다. 위 분담 표는 10/28 협의 기록이며, 현재 시뮬레이션 담당 범위는 이 설명을 따른다. 후보 카드의 `simulation`은 아직 `null`이며 프론트엔드 연결은 후속 작업이다.
@@ -259,7 +260,7 @@ with TemporaryDirectory() as directory:
 
 ## 시뮬레이션 저장 구조 · 실행기 연결 (작업 1)
 
-`app/simulations.py`는 실행기·시작 API·상태 조회·SSE·완료 리포트가 공유할 저장 계층이다. 작업 1은 SQLite 저장과 조회를 제공하며 작업 2에서 시작 API와 실행기를 연결했다(아래 작업 2 절 참고). SSE 전송과 리포트 조립은 아직 연결하지 않았다. 기존 후보 API의 `simulation: null`도 그대로다. 작업 1~4는 기존 범찬 담당 연결·리포트 부분을 포함하여 일준이 진행하며, 위 분담 표는 10/28 당시 협의 기록이다.
+`app/simulations.py`는 실행기·시작 API·상태 조회·SSE·완료 리포트가 공유할 저장 계층이다. 작업 1은 SQLite 저장과 조회를 제공하며 작업 2에서 시작 API와 실행기를 연결했다(아래 작업 2 절 참고). SSE 전송은 작업 3에서 연결했으며 리포트 조립은 아직 연결하지 않았다. 기존 후보 API의 `simulation: null`도 그대로다. 작업 1~4는 기존 범찬 담당 연결·리포트 부분을 포함하여 일준이 진행하며, 위 분담 표는 10/28 당시 협의 기록이다.
 
 ### 테이블 관계와 기존 DB 보존
 
@@ -379,7 +380,7 @@ PY
 
 ## 시뮬레이션 시작 API · 실행기 (작업 2)
 
-작업 1~4는 기존 범찬 담당 연결 부분까지 일준이 진행한다. 작업 2는 `POST /api/simulations`와 `app/simulation_runner.py`를 연결한다. 상태 조회·SSE·리포트·매칭·규칙 API와 프론트엔드는 이번 범위에 없다. 후보 카드의 `simulation: null`도 유지한다.
+작업 1~4는 기존 범찬 담당 연결 부분까지 일준이 진행한다. 작업 2는 `POST /api/simulations`와 `app/simulation_runner.py`를 연결한다. 작업 2 자체는 시작·실행만 담당하며 상태 조회·SSE는 아래 작업 3에서 연결한다. 리포트·매칭·규칙 API와 프론트엔드는 후속 범위다. 후보 카드의 `simulation: null`도 유지한다.
 
 - 요청: `X-User-Id` 헤더와 `{"persona_id":"...","candidate_id":"...","mode":"live"}`. mode 생략 시 live. 등록 사용자와 본인 페르소나를 확인하고 기존 `select_candidates` 상위 3명만 허용한다. 헤더 누락/미등록은 401 USER_REQUIRED, 비소유/없는 페르소나/선택 불가 후보는 404 PERSONA_NOT_FOUND, 잘못된 JSON·필드·mode는 422 VALIDATION_ERROR다.
 - 신규는 202 + 공통 Simulation 모델, 동일 페르소나·후보·실제 모드의 running/completed는 200 + 기존 모델. `BEGIN IMMEDIATE`와 기존 부분 UNIQUE 인덱스가 중복 예약을 막고, created=true일 때만 task를 등록한다. 응답은 전체 엔진 실행을 기다리지 않는다. failed는 새 ID로 다시 요청할 수 있다.
@@ -413,7 +414,7 @@ ENGINE_IMPL=fake SIM_MODE=agents DATABASE_PATH=/tmp/kkokkoroom-demo.sqlite3 .ven
 2. GET `/api/survey`로 문항을 확인한다. POST `/api/personas`의 X-User-Id에 user_id, body에 위 페르소나 실행 예시의 12문항 answers를 입력하고 persona_id를 복사한다.
 3. GET `/api/personas/{persona_id}/candidates`에 같은 헤더를 보내 candidate_id를 선택한다.
 4. POST `/api/simulations`에 같은 헤더와 persona_id/candidate_id/mode=live를 보내 202와 simulation_id를 확인한다. 같은 요청은 200으로 기존 실행을 반환한다.
-5. 상태 조회 API는 아직 없으므로 아래 읽기 전용 SQLite 조회로 완료와 진행률을 확인한다. failed이면 failure의 안전한 오류 정보를 확인한다. 앱 로그의 `시뮬레이션 completed/failed`는 app 로거 INFO를 활성화한 경우 볼 수 있다(uvicorn log-level만으로 앱 INFO가 표시되는 것은 아니다).
+5. GET `/api/simulations/{simulation_id}`에 같은 X-User-Id를 넣어 상태·진행률을 확인한다. 아래 SQLite 조회는 내부 진단용이며 failure 상세를 공개 응답으로 사용하지 않는다. 앱 로그의 `시뮬레이션 completed/failed`는 app 로거 INFO를 활성화한 경우 볼 수 있다(uvicorn log-level만으로 앱 INFO가 표시되는 것은 아니다).
 
 ```bash
 sqlite3 -readonly /tmp/kkokkoroom-demo.sqlite3 'SELECT simulation_id,status,done,total,result,failure FROM simulations ORDER BY created_at;'
@@ -422,3 +423,67 @@ sqlite3 -readonly /tmp/kkokkoroom-demo.sqlite3 'SELECT simulation_id,status,done
 ```
 
 테스트는 임시 DB와 제어 가능한 가짜 엔진만 사용한다. 정상 백그라운드 20장면/점수 저장, 응답 시 미완료, 사용자/후보/요청 검증, 동시 중복과 완료 재사용, 후보 3명 격리, 실명 비노출, 예외/시간 초과/취소/불완전 종료, 시작/DB 실패, queued 충돌, 서버 종료·재시작, replay 부재 fallback과 데이터 존재 시 명시적 실패를 검증한다. 유료 LLM과 실제 사용자 DB는 사용하지 않는다.
+
+
+## 상태 조회 · SSE 진행 상황 전달 (작업 3)
+
+작업 1의 공개 Simulation·이벤트 저장과 작업 2의 실행기를 재사용한다. 두 GET API 모두 엔진 호출, 신규 실행, 이벤트 생성이나 진행률 갱신을 하지 않는다. **다음 작업 4인 완료 리포트 API는 아직 구현되지 않았다.** 프론트엔드·매칭·생활 규칙도 이번 범위에서 제외했다.
+
+### 상태 조회와 수동 확인
+
+`GET /api/simulations/{simulation_id}`는 공통 API 3장의 Simulation을 반환한다. `status`는 queued/running/completed/failed이며 `progress`는 `{ "done": 9, "total": 20 }` 형태다. done은 저장 계층에서 장면 판정과 같은 트랜잭션으로 기록한 완료 장면 수다(pending 판정도 완료 장면). 완료는 20/20과 점수·completed_at을 반환하고, 실패는 마지막 진행률과 null 점수·completed_at을 유지한다. 대화 전문이나 내부 실패 상세는 포함하지 않는다. SSE를 사용할 수 없으면 명세대로 2초 간격으로 조회하고 completed/failed에서 폴링을 멈춘다.
+
+`/docs`에서 위 작업 2의 사용자→페르소나→후보→시작 순서로 ID를 얻은 뒤 GET `/api/simulations/{simulation_id}` → Try it out → simulation_id와 X-User-Id 입력 → Execute로 확인한다. `/docs`의 스트림 표시가 실시간 수신을 보장하지 않으므로 SSE는 터미널에서 확인한다. 아래 값은 같은 서버에서 발급한 실제 ID로 바꾼다. 사용 중인 서버나 개발 DB를 변경하지 않으려면 앞 절의 별도 시연 DB·빈 포트로 실행한다.
+
+```bash
+SIM_USER_ID=usr_abcdefgh
+SIM_RUN_ID=sim_abcdefgh
+SIM_BASE=http://localhost:8000
+curl -sS -H "X-User-Id: $SIM_USER_ID" "$SIM_BASE/api/simulations/$SIM_RUN_ID"
+curl -N -H 'Accept: text/event-stream' -H "X-User-Id: $SIM_USER_ID" \
+  "$SIM_BASE/api/simulations/$SIM_RUN_ID/events"
+# 실제로 마지막까지 처리한 이벤트 ID를 넣어 재연결한다.
+curl -N -H 'Accept: text/event-stream' -H "X-User-Id: $SIM_USER_ID" \
+  -H 'Last-Event-ID: 0-0' "$SIM_BASE/api/simulations/$SIM_RUN_ID/events"
+```
+
+### 이벤트와 재연결 계약
+
+응답은 `Content-Type: text/event-stream; charset=utf-8`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`다. UTF-8 JSON 한 줄과 빈 줄로 프레임을 구분한다. 아래는 형식 예시다.
+
+```text
+id: 0-0
+event: simulation_started
+data: {"simulation_id":"sim_abcdefgh","mode":"live","total_scenes":20,"me":{"name":"하늘","type_name":"아침형"},"candidate":{"alias":"후보 A","type_name":"조용한 유형"}}
+
+: ping
+
+```
+
+- 실행기가 저장한 simulation_started → scene_started/utterance/scene_judged → simulation_completed 또는 error를 DB의 정수 sequence 순서로 전송한다. 시작 이벤트는 매 접속 시 새로 만들지 않는다. 공통 API 5.1의 “연결 직후 1회”는 저장된 시작 이벤트 재생을 뜻하며 5.3의 커서 이후 재전송 규칙을 우선한다.
+- Last-Event-ID가 없으면 처음부터, 있으면 **해당 ID 다음**부터 보낸다. ID는 작업 1의 `{scene_index}-{장면 내 순번}`이며 실행 내에서만 유일하다. 문자열 사전순 비교나 장면 번호만으로 건너뛰지 않는다. 클라이언트는 `(simulation_id, id)`로 중복을 제거한다. 네트워크 재연결의 정확히 한 번 전달은 보장하지 않는다.
+- 공통 명세에 잘못된 커서의 세부 HTTP 정책이 없어 기존 저장 함수의 ValueError와 공통 422 VALIDATION_ERROR를 연결했다. 빈 값, 잘못된 형식, 아직 저장되지 않은 미래/범위 밖 ID, 다른 실행에만 있는 ID는 스트림 시작 전에 422다. 다른 실행에서 얻은 ID라도 대상 실행에 같은 문자열이 존재하면 구분할 수 없으며 대상 실행의 커서로 해석한다. 전역 ID나 새 인증 규칙은 도입하지 않았다.
+- 각 구독이 독립 커서를 가지며 읽어도 DB 이벤트를 삭제하지 않는다. 상태와 최대 64개 이벤트를 하나의 읽기 트랜잭션에서 조회하므로 과거 조회/대기 경계와 종료 상태 변경 사이의 이벤트도 다음 조회에서 받는다. 쌓인 페이지는 즉시 이어 읽고, 새 데이터가 없으면 0.5초마다 조회한다. DB 읽기는 스레드풀에서 수행하고 대기 전에 연결·트랜잭션을 닫는다. 실행기 변경이나 메모리 이벤트 큐 없이 영속 DB를 전달 근거로 사용한다.
+- 업무 이벤트가 없는 동안 15초마다 `: ping` 주석을 보낸다. heartbeat에는 id가 없으며 DB 이벤트와 진행률에 포함하지 않는다. 연결 해제 시 Starlette가 구독 generator/대기를 취소하며 실행기 task는 계속된다. 진행 중 DB 호출은 짧은 조회가 끝나 연결을 닫은 뒤 정리된다(SQLite 잠금 대기는 기존 10초 제한).
+- 완료·실패 이벤트까지 전송한 뒤 정상 EOF로 끝낸다. 이미 종료된 실행도 저장 이벤트를 재생한다. 마지막 종료 ID로 재접속하면 보낼 이벤트 없이 200 EOF다. 클라이언트는 simulation_completed 또는 retryable=false error에서 재접속을 멈춘다. retryable=true 재연결도 저장 이력만 재조회하며 엔진을 다시 실행하지 않는다.
+- 공개 data만 읽으며 후보 실명은 기존 저장 계층의 별칭 치환을 재사용한다. error의 자유 메시지·알 수 없는 code는 내부 경로·비밀 유출 방지를 위해 공개 경계에서 고정 문구/INTERNAL_ERROR로 변환한다. 알려진 LLM 오류는 code·retryable을 보존하고 INTERNAL_ERROR는 retryable=false다. 내부 원본은 변경하지 않는다. 임의 생성 대화의 모든 개인정보를 판별하는 기능은 아니다.
+- 브라우저 기본 EventSource는 X-User-Id를 설정할 수 없으므로 공통 API 5.4처럼 fetch 스트림과 헤더를 사용한다. 사용자 ID를 URL에 넣는 인증 방식은 제공하지 않는다.
+
+### 오류 · 운영 · 현재 제한
+
+스트림 시작 전 사용자 누락·빈 헤더·미등록은 401 USER_REQUIRED, 없는 실행/다른 소유자는 동일한 404 SIMULATION_NOT_FOUND, 잘못된 커서는 422 VALIDATION_ERROR, DB 처리 오류는 500 INTERNAL_ERROR다. 모두 `{ "error": { "code": "...", "message": "..." } }` JSON이다. 200 전송 후 DB 장애는 내부 상세나 임의 업무 이벤트를 보내지 않고 스트림을 닫고 서버에 기록한다. 클라이언트는 마지막 처리 ID로 재접속할 수 있다.
+
+서버 재시작 시 작업 2의 단일 worker 복구가 미종료 실행을 실패 처리하고 error를 저장한다. 기존 이벤트와 이 error는 재접속 후 조회 가능하며 자동 재실행하지 않는다. 동일 DB당 workers=1 제약과 replay 파일 계약/실제 재생 미구현은 그대로다. 따라서 REPLAY_DELAY_MS 기반 재생도 아직 지원하지 않는다. 구독별 폴링이므로 대규모 동시 접속 성능은 검증하지 않았으며, 엔진의 기존 동기 SQLite 쓰기로 인한 이벤트 루프 지연도 남아 있다.
+
+저장소의 실제 배포 구성 `deploy/docker-compose.yml`과 `frontend/nginx.conf`를 확인했다. `/api/`에 HTTP/1.1, Connection 제거, proxy_buffering off, proxy_cache off, proxy_read_timeout 1h가 있어 15초 heartbeat와 호환된다. 보호된 배포 파일은 수정하지 않았다. 실행 중 VM·외부 CDN/LB의 실제 적용 상태와 타임아웃은 접근하지 않아 검증하지 못했다.
+
+### 테스트
+
+backend 디렉터리에서:
+
+```bash
+.venv/bin/python -m pytest tests/test_simulation_progress.py -q
+.venv/bin/python -m pytest tests -q
+```
+
+임시 DB와 가짜/제어 가능한 엔진으로 조회 상태·진행률·무변경, 접근 제어, 프레임·순서·ID·재연결·잘못된 커서, 페이지/대기 경계 누락, 완료/실패·종료 후 접속, 후보 실명·내부 오류 비노출, 앱 재시작·복구를 검사한다. 실제 HTTP 테스트는 OS가 할당한 루프백 임시 포트의 uvicorn과 httpx 스트림으로 **실행 종료 전에 첫 프레임 수신**, 새 이벤트 전달, 두 구독의 독립 수신, 연결 종료 후 generator 정리·실행기 유지, heartbeat 비저장을 확인한다. 비동기 테스트는 시간 제한과 finally 정리를 사용한다. 로컬 포트 바인딩이 차단된 환경에서는 권한 허용이 필요하며 이 검사를 생략한 채 실시간 전달 검증을 완료했다고 판단하면 안 된다. 유료 LLM과 실제 개발 DB는 사용하지 않는다.
