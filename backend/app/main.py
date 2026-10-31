@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
+from app.match_api import create_match_router
 from app.simulation_api import create_simulation_router
 from app.simulation_runner import SimulationRunner
 from app.engine_adapter import EngineError
@@ -57,7 +58,7 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
-        if request.url.path.startswith(('/api/personas', '/api/simulations')):
+        if request.url.path.startswith(('/api/personas', '/api/simulations', '/api/matches')):
             return error_response(422, 'VALIDATION_ERROR', '요청 JSON의 필드·자료형과 문구 길이를 확인해 주세요.')
         return error_response(422, 'VALIDATION_ERROR', '요청 JSON 형식을 확인해 주세요. 닉네임은 앞뒤 공백을 제외한 1~10자 문자열이어야 해요.')
 
@@ -95,6 +96,7 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
                                                      error_model=ErrorResponse, seed_path=seeds))
     application.include_router(create_simulation_router(database, seeds, runner,
         replay_path if replay_path is not None else BACKEND_DIR.parent / 'data/replays', ErrorResponse))
+    application.include_router(create_match_router(database, ErrorResponse))
     return application
 
 
