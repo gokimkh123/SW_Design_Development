@@ -1,6 +1,7 @@
 import type {
   Answers, ApiClient, Candidate, Comparison, Match, Persona, RephraseResult, Report,
-  Health, Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Survey, User,
+  Health, Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Subscription,
+  SubscriptionPlan, Survey, User,
 } from './types';
 
 const USER_KEY = 'roommate.user_id';
@@ -176,5 +177,8 @@ export const realApi: ApiClient = {
     request<Rule>(`/proposals/${encodeURIComponent(proposalId)}/accept`, 'POST'),
   rephraseMemo: (matchId: string, memo: string) =>
     request<RephraseResult>('/mediation/rephrase', 'POST', { match_id: matchId, memo }),
+  getSubscription: () => request<Subscription>('/subscriptions/me'),
+  saveSubscription: (plan: SubscriptionPlan) => request<Subscription>('/subscriptions/me', 'PUT', { plan }),
+  cancelSubscription: () => request<Subscription>('/subscriptions/me', 'DELETE'),
   subscribeSimulation,
 };

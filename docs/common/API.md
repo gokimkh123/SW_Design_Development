@@ -94,6 +94,7 @@ sequenceDiagram
 | 18 | POST | `/api/rules/{rule_id}/proposals` | 규칙 수정 제안 → AI 중재안 | P1 | 범찬 | C3 |
 | 19 | POST | `/api/proposals/{proposal_id}/accept` | 중재안 수락 | P1 | 범찬 | C3 |
 | 20 | POST | `/api/mediation/rephrase` | 불편 메모 → 요청형 문장 | P1 | 일준 | D2 |
+| 21 | GET · PUT · DELETE | `/api/subscriptions/me` | 멤버십 사전 구독 신청 조회 · 신청(변경) · 취소 | 부가 | 건한 | 멤버십 |
 | 21 | POST | `/api/matches/{match_id}/accept` | 상대 수락 (실사용자끼리 매칭) | P2 | - | - |
 
 ---
@@ -537,6 +538,29 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 ```
 
 - 메모 원문 미저장 · 상대 미전달
+
+### 4.17 멤버십 사전 구독 신청
+
+발표회 체험판은 결제를 연동하지 않으며, 사용자별로 선택한 플랜만 기록한다. 카드 · 계좌 · 연락처 등 결제 · 개인 정보는 받지 않는다.
+
+| 플랜 ID | 화면 표기 | 가격(화면 안내) |
+| --- | --- | --- |
+| `plus_semester` | 플러스 학기 패스 | 9,900원 / 6개월 |
+| `plus_monthly` | 플러스 월간 | 2,900원 / 월 |
+| `dorm` | 생활관 도입 관심 | 입사생 1인당 학기 2,000원 |
+
+**GET /api/subscriptions/me** — `200`
+
+```jsonc
+{ "plan": "plus_semester", "updated_at": "2026-11-02T10:12:00+09:00" }   // 미신청 · 취소 시 { "plan": null, "updated_at": null }
+```
+
+**PUT /api/subscriptions/me** — 요청 `{ "plan": "plus_semester" }`, `200` → 위와 같은 형식. 이미 신청한 사용자는 플랜을 바꾼다(사용자당 1건)
+
+**DELETE /api/subscriptions/me** — `200` → `{ "plan": null, "updated_at": null }` (반복 호출 안전)
+
+- `X-User-Id` 필수(없거나 미등록 `401 USER_REQUIRED`), 정의되지 않은 플랜 · 추가 필드 `422 VALIDATION_ERROR`
+- 신청 수는 화면에 공개하지 않음
 
 ---
 

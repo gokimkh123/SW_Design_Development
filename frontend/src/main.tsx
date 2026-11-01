@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles.css';
+// 반응형 규칙은 모든 화면 CSS 뒤에 적용 (PC 레이아웃이 기본 규칙을 덮도록)
+import './features/responsive.css';
 
 /** 예기치 못한 화면 오류 시 빈 화면 대신 안내와 다시 시작 버튼 표시 */
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
