@@ -11,8 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field
 # 백분율 정수 가중치로 부동소수점 오차와 Python round의 짝수 반올림을 피한다.
 WEIGHTS = {'sleep_rhythm': 30, 'noise_sensitivity': 25, 'cleanliness': 20,
            'sociability': 15, 'sharing_tolerance': 10}
-AXIS_NAMES = {'sleep_rhythm': '수면 리듬', 'noise_sensitivity': '소음 민감',
-              'cleanliness': '청결', 'sociability': '사교성', 'sharing_tolerance': '공유 성향'}
+# 후보 카드 한 줄 요약용 축 이름 (예: "청결 기준 비슷")
+HIGHLIGHT_NAMES = {'sleep_rhythm': '수면 리듬', 'noise_sensitivity': '소음 민감도',
+                   'cleanliness': '청결 기준', 'sociability': '사교성', 'sharing_tolerance': '공유 성향'}
 Nonempty = Annotated[str, Field(min_length=1, pattern=r'\S')]
 
 
@@ -66,6 +67,16 @@ def pre_score(me: dict, other: dict) -> int:
     return (hundredths + 50) // 100
 
 
+def highlight_text(axis: str, gap: int) -> str:
+    """가장 가까운 축을 사람이 읽는 문구로: 10점 이하 '비슷', 25점 이하 '비교적 비슷', 그 이상은 차이 점수."""
+    name = HIGHLIGHT_NAMES[axis]
+    if gap <= 10:
+        return f'{name} 비슷'
+    if gap <= 25:
+        return f'{name} 비교적 비슷'
+    return f'{name} 차이 {gap}점'
+
+
 def select_candidates(me: dict, seed_path: Path) -> CandidatesResponse:
     """반올림 점수 내림차순, 동점은 ID 오름차순. 부족하면 0~2명 반환.
 
@@ -95,7 +106,7 @@ def select_candidates(me: dict, seed_path: Path) -> CandidatesResponse:
         cards.append(CandidateResponse(
             candidate_id=seed.persona_id, alias='', department=raw['department'],
             year=raw['year'], type_name=raw['type_name'], pre_score=score,
-            highlight=f'{AXIS_NAMES[closest]} 차이 {gap}점', simulation=None))
+            highlight=highlight_text(closest, gap), simulation=None))
     cards.sort(key=lambda card: (-card.pre_score, card.candidate_id))
     selected = cards[:3]
     for card, letter in zip(selected, 'ABC'):

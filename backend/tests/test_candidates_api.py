@@ -7,7 +7,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.candidates import WEIGHTS, pre_score
+from app.candidates import WEIGHTS, highlight_text, pre_score
 from app.database import connect_database
 from app.main import BACKEND_DIR, create_app
 from app.personas import create_persona
@@ -68,9 +68,19 @@ def test_ranking_contract_privacy_and_stability(setup):
         assert card['simulation'] is None
         assert card['department'] == '테스트학과' and card['year'] == 1
     assert '비공개' not in response.text and 'private.png' not in response.text
+    # 축이 같은 후보는 "차이 0점" 대신 사람이 읽는 문구로 표시
+    assert cards[0]['highlight'].endswith(' 비슷') and '차이 0점' not in response.text
     data = json.loads(setup[2].read_text(encoding='utf-8'))['personas']
     write_seeds(setup, list(reversed(data)))
     assert request(setup).json() == response.json()
+
+
+@pytest.mark.parametrize('axis,gap,expected', [
+    ('cleanliness', 0, '청결 기준 비슷'), ('noise_sensitivity', 10, '소음 민감도 비슷'),
+    ('sleep_rhythm', 11, '수면 리듬 비교적 비슷'), ('sociability', 25, '사교성 비교적 비슷'),
+    ('sharing_tolerance', 26, '공유 성향 차이 26점')])
+def test_highlight_text_tiers(axis, gap, expected):
+    assert highlight_text(axis, gap) == expected
 
 
 @pytest.mark.parametrize('axis,weight', WEIGHTS.items())
