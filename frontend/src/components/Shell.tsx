@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon, type IconName } from './Icon';
 
 export type AppTab = 'room' | 'match' | 'persona' | 'plans' | 'all';
 
@@ -17,12 +18,12 @@ type AppShellProps = {
   className?: string;
 };
 
-const tabs: { id: AppTab; label: string; icon: string }[] = [
-  { id: 'room', label: '우리 방', icon: '⌂' },
-  { id: 'match', label: '매칭', icon: '♧' },
-  { id: 'persona', label: '페르소나', icon: '✧' },
-  { id: 'plans', label: '멤버십', icon: '◇' },
-  { id: 'all', label: '전체', icon: '☷' },
+const tabs: { id: AppTab; label: string; icon: IconName }[] = [
+  { id: 'room', label: '우리 방', icon: 'room' },
+  { id: 'match', label: '매칭', icon: 'match' },
+  { id: 'persona', label: '페르소나', icon: 'persona' },
+  { id: 'plans', label: '멤버십', icon: 'plans' },
+  { id: 'all', label: '전체', icon: 'all' },
 ];
 
 export function AppShell({ children, title, subtitle, showBack = false, onBack, activeTab, enabledTabs, visibleTabs, onTabChange, footer, className = '' }: AppShellProps) {
@@ -46,7 +47,7 @@ export function AppShell({ children, title, subtitle, showBack = false, onBack, 
       {footer ? <div className="app-footer">{footer}</div> : null}
       {activeTab ? (
         <nav className="bottom-nav" aria-label="주 메뉴" style={{ gridTemplateColumns: `repeat(${shownTabs.length}, 1fr)` }}>
-          <div className="side-brand" aria-hidden="true"><span>🛏️</span><div><strong>룸메궁합</strong><small>AI 가상 동거 룸메이트 매칭</small></div></div>
+          <div className="side-brand" aria-hidden="true"><span><Icon name="bed" size={24} /></span><div><strong>룸메궁합</strong><small>AI 가상 동거 룸메이트 매칭</small></div></div>
           {shownTabs.map((tab) => {
             const enabled = enabledTabs?.includes(tab.id) ?? activeTab === tab.id;
             return (
@@ -59,7 +60,7 @@ export function AppShell({ children, title, subtitle, showBack = false, onBack, 
               disabled={!enabled}
               onClick={() => onTabChange?.(tab.id)}
             >
-              <span className="bottom-nav-icon" aria-hidden="true">{tab.icon}</span>
+              <span className="bottom-nav-icon" aria-hidden="true"><Icon name={tab.icon} size={22} strokeWidth={1.9} /></span>
               <span>{tab.label}</span>
             </button>
           );})}

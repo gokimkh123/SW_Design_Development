@@ -46,6 +46,8 @@ def connect_database(db_path: Path | str) -> Iterator[sqlite3.Connection]:
     db = sqlite3.connect(db_path, timeout=10)
     try:
         db.execute('PRAGMA foreign_keys = ON')
+        # WAL에서는 NORMAL로도 손상 없이 안전 · 쓰기마다 fsync를 줄여 이벤트 저장 지연을 낮춤
+        db.execute('PRAGMA synchronous = NORMAL')
         with db:
             yield db
     finally:
@@ -93,3 +95,13 @@ def initialize_database(db_path: Path) -> None:
             for name, sql in INDEXES.items():
                 if name not in existing:
                     db.execute(sql)
+    # WAL: SSE 읽기(초당 여러 번)가 이벤트 쓰기를 막지 않게 함. 스키마 확인이 끝난 뒤에만 전환해
+    # 충돌 시에는 기존 파일을 그대로 보존한다. 설정은 DB 파일에 유지되며 이미 WAL이면 변화 없음
+    wal = sqlite3.connect(db_path, timeout=10)
+    try:
+        if wal.execute('PRAGMA journal_mode').fetchone()[0].lower() != 'wal':
+            wal.execute('PRAGMA journal_mode = WAL')
+    except sqlite3.OperationalError:
+        pass  # 다른 연결이 동시에 전환 중(잠김)이면 다음 호출에서 다시 시도. 성능 설정이라 동작에는 영향 없음
+    finally:
+        wal.close()
