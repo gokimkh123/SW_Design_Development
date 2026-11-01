@@ -23,7 +23,7 @@ SEEDS = Path(__file__).resolve().parents[2] / 'data/seed/personas.json'
 def context(tmp_path):
     db = tmp_path / 'test.db'
     user = create_user(db, '테스터')
-    raw = json.loads(SEEDS.read_text())['personas'][0]
+    raw = json.loads(SEEDS.read_text(encoding='utf-8'))['personas'][0]
     data = {k: raw[k] for k in PersonaData.model_fields}
     data['is_seed'] = False
     me = create_persona(db, user['user_id'], data)

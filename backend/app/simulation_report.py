@@ -40,7 +40,19 @@ class Report(store.EventData):
     verdict_counts: Counts
     scene_verdicts: list[Literal['harmonious', 'negotiated', 'conflict', 'pending']] = Field(min_length=20, max_length=20)
     highlights: list[Highlight]
-    expected_conflicts_per_month: None
+    expected_conflicts_per_month: float | None = Field(default=None, ge=0)
+
+
+# 월 예상 갈등(추정치) = 한 달 생활 마찰 상황 8회(주 2회 가정) × (충돌 + 0.5 × 조율) / 판정 장면 수
+MONTHLY_FRICTION_SITUATIONS = 8
+
+
+def expected_conflicts(counts: dict) -> float | None:
+    judged = sum(counts.get(key, 0) for key in ('harmonious', 'negotiated', 'conflict'))
+    if not judged:
+        return None
+    weighted = counts.get('conflict', 0) + 0.5 * counts.get('negotiated', 0)
+    return round(MONTHLY_FRICTION_SITUATIONS * weighted / judged, 1)
 
 
 def get_report(database, simulation_id, *, user_id):
@@ -83,7 +95,7 @@ def get_report(database, simulation_id, *, user_id):
         public = dict(simulation_id=simulation_id,
             candidate=dict(candidate_id=row['candidate_id'], alias=row['alias'], type_name=candidate['type_name']),
             score=result['score'], headline=result['headline'], verdict_counts=counts,
-            scene_verdicts=verdicts, highlights=highlights, expected_conflicts_per_month=None)
+            scene_verdicts=verdicts, highlights=highlights, expected_conflicts_per_month=expected_conflicts(counts))
         # 식별자는 보존하고 스냅샷의 알려진 실명은 공개 자유 문구에서 다시 제거한다.
         public['candidate']['type_name'] = store._anonymize(public['candidate']['type_name'], candidate, row['alias'])
         for key in ('headline', 'highlights'):

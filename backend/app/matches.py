@@ -154,3 +154,61 @@ def create_match(db_path, record, rules):
             else:
                 raise RuntimeError('규칙 ID 생성 재시도 한도 초과')
         return _public(_owned(db, match_id, record['user_id']))
+
+
+def _context(db, match_row):
+    """매칭에 연결된 실행의 익명 엔진 입력과 별칭 · 상대 이름 (중재 · 문장 변환 엔진 호출용)."""
+    run = db.execute('SELECT engine_inputs, inputs, alias FROM simulations WHERE simulation_id=?',
+                     (match_row['simulation_id'],)).fetchone()
+    inputs = json.loads(run['engine_inputs'])
+    return dict(me=inputs['me'], candidate=inputs['candidate'], alias=run['alias'],
+                name=json.loads(run['inputs'])['candidate']['name'])
+
+
+def load_rule_context(db_path, rule_id, *, user_id):
+    """소유 매칭의 규칙과 엔진 입력. 없거나 다른 사용자의 규칙이면 None."""
+    with store._connection(db_path) as db:
+        rule = db.execute('SELECT r.* FROM rules r JOIN matches m ON m.match_id = r.match_id '
+                          'WHERE r.rule_id=? AND m.user_id=?', (rule_id, user_id)).fetchone()
+        if rule is None:
+            return None
+        return dict(_context(db, _owned(db, rule['match_id'], user_id)),
+                    rule=dict(rule_id=rule['rule_id'], area=rule['area'], area_label=rule['area_label'],
+                              text=rule['text']))
+
+
+def load_match_context(db_path, match_id, *, user_id):
+    with store._connection(db_path) as db:
+        match = _owned(db, match_id, user_id)
+        return _context(db, match) if match else None
+
+
+def create_proposal(db_path, rule_id, *, user_id, text, reason, mediation):
+    with store._connection(db_path, write=True) as db:
+        for _ in range(10):
+            proposal_id = _new_id('prp_')
+            if db.execute('INSERT INTO rule_proposals (proposal_id,rule_id,user_id,text,reason,mediation,status,'
+                          "created_at) VALUES (?,?,?,?,?,?,'proposed',?) ON CONFLICT(proposal_id) DO NOTHING",
+                          (proposal_id, rule_id, user_id, text, reason,
+                           json.dumps(mediation, ensure_ascii=False), _now())).rowcount:
+                return dict(proposal_id=proposal_id, rule_id=rule_id, mediation=mediation)
+        raise RuntimeError('제안 ID 생성 재시도 한도 초과')
+
+
+def accept_proposal(db_path, proposal_id, *, user_id):
+    """중재안을 규칙 문구로 반영한다. 상대는 시드 후보라 자동 수락하며 반복 호출해도 결과가 같다."""
+    with store._connection(db_path, write=True) as db:
+        proposal = db.execute('SELECT p.* FROM rule_proposals p JOIN rules r ON r.rule_id = p.rule_id '
+                              'JOIN matches m ON m.match_id = r.match_id '
+                              'WHERE p.proposal_id=? AND p.user_id=? AND m.user_id=?',
+                              (proposal_id, user_id, user_id)).fetchone()
+        if proposal is None:
+            return None
+        if proposal['status'] != 'accepted':
+            db.execute('UPDATE rules SET text=? WHERE rule_id=?',
+                       (json.loads(proposal['mediation'])['text'], proposal['rule_id']))
+            db.execute("UPDATE rule_proposals SET status='accepted' WHERE proposal_id=?", (proposal_id,))
+        r = db.execute('SELECT * FROM rules WHERE rule_id=?', (proposal['rule_id'],)).fetchone()
+        return dict(rule_id=r['rule_id'], area=r['area'], area_label=r['area_label'], text=r['text'],
+                    source=dict(scene_index=r['source_scene_index'], day=r['source_day'],
+                                verdict=r['source_verdict']))

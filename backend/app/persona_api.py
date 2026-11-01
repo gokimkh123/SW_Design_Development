@@ -11,7 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
 from app.engine_adapter import EngineAdapter, get_engine, load_engine
-from app.candidates import CandidatesResponse, select_candidates
+from app.candidates import CandidateSimulation, CandidatesResponse, select_candidates
+from app import simulations as sim_store
 from app.personas import PersonaData, create_persona, get_persona, update_preferences
 from app.survey import Survey, load_survey
 from app.users import get_user
@@ -127,7 +128,15 @@ def create_persona_router(database: Path, official: Path, draft: Path, *,
         persona = get_persona(database, persona_id, user_id=user['user_id'])
         if persona is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
-        return select_candidates(persona, seed_path)
+        result = select_candidates(persona, seed_path)
+        # 후보별 최근 실행 상태를 함께 반환 (API.md 3 Candidate.simulation)
+        latest = sim_store.latest_by_candidate(database, persona_id, user_id=user['user_id'])
+        for card in result.candidates:
+            run = latest.get(card.candidate_id)
+            if run:
+                card.simulation = CandidateSimulation.model_validate(
+                    {key: run[key] for key in ('simulation_id', 'status', 'progress', 'score')})
+        return result
 
     @router.patch('/{persona_id}', response_model=PersonaResponse,
                   responses={404: {'model': error_model}})

@@ -1,11 +1,18 @@
 # VM 실행 구성 (CD가 ~/roommate/에 복사 후 docker compose pull · up 실행)
 # 같은 폴더의 .env: 백엔드 환경변수(API 키 등) + WEB_PORT, VM에서 직접 작성 (커밋 금지)
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   frontend:
     image: ghcr.io/gokimkh123/roommate-frontend:latest
     ports:
       - "${WEB_PORT:-80}:80"
     restart: unless-stopped
+    logging: *logging
 
   backend:
     image: ghcr.io/gokimkh123/roommate-backend:latest
@@ -14,9 +21,12 @@ services:
         required: false
     environment:
       DATABASE_URL: sqlite:////srv/var/roommate.db
+      # 가짜 엔진 · 리플레이 발화 간격(ms): 화면에서 대화가 차례로 보이도록
+      REPLAY_DELAY_MS: ${REPLAY_DELAY_MS:-600}
     volumes:
       - backend-db:/srv/var
     restart: unless-stopped
+    logging: *logging
 
 volumes:
   backend-db:

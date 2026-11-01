@@ -49,7 +49,7 @@ flowchart LR
 
 ### 보호 경로 규칙
 
-- 대상: `.github/` · `.githooks/` · `scripts/` · `deploy/` · `docs/common/` · `.gitignore` · `.gitattributes` · `.dockerignore` · `Dockerfile`
+- 대상: `.github/` · `.githooks/` · `scripts/` · `deploy/` · `docs/common/` · `.gitignore` · `.gitattributes` · `.dockerignore` · `Dockerfile` · `frontend/nginx.conf` · `backend/requirements*.txt`
 - 위 경로 변경이 포함된 push는 CI 통과 후에도 자동 병합 중단 (CI/CD · 보안 설정 및 공통 문서 무단 변경 방지)
 - 반영 방법: 해당 변경만 단기 브랜치(`chore/…` · `docs/…`)로 분리 → `develop` 대상 PR 생성 → 건한 승인 후 병합
 - 병합 방식: 단기 브랜치 PR은 **Squash and merge**, `frontend` · `backend` 출발 PR은 **Create a merge commit** (장기 브랜치 이력 보존)

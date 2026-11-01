@@ -162,7 +162,7 @@ test('실 API: 백엔드 연결 실패를 안내 가능한 오류로 반환한�
     await assert.rejects(realApi.getHealth(), {
       status: 0,
       code: 'NETWORK_ERROR',
-      message: '백엔드에 연결할 수 없어요. 서버 실행 상태를 확인해 주세요.',
+      message: '네트워크 연결이 불안정해요. 잠시 후 다시 시도해 주세요.',
     });
   } finally {
     globalThis.fetch = originalFetch;
@@ -206,23 +206,29 @@ test('실 SSE: 인증 헤더·Last-Event-ID 재연결·중복 제거', async () 
   }
 });
 
-test('실 SSE: 서버 오류 이벤트 뒤 리더를 취소하고 잠금을 해제한다', async () => {
+test('실 SSE: 서버 오류 이벤트는 실행 종료로 보고 재연결 없이 리더를 정리한다', async () => {
   setUserId('usr_test0001');
   const originalFetch = globalThis.fetch;
   let canceled = 0;
-  globalThis.fetch = async () => new Response(new ReadableStream<Uint8Array>({
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response(new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(new TextEncoder().encode(
         'id: 1-0\nevent: error\ndata: {"code":"LLM_UNAVAILABLE","message":"다시 시도","retryable":true}\n\n',
       ));
     },
     cancel() { canceled++; },
-  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }); };
   try {
-    await new Promise<void>((resolve) => {
-      realApi.subscribeSimulation('sim_error', () => {}, () => resolve());
+    let failed = false;
+    const event = await new Promise<SimulationEvent>((resolve) => {
+      realApi.subscribeSimulation('sim_error', resolve, () => { failed = true; });
     });
-    assert.equal(canceled, 3);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(event.type, 'error');
+    assert.equal(calls, 1);
+    assert.equal(canceled, 1);
+    assert.equal(failed, false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -253,11 +259,10 @@ test('실 SSE: 잘못된 JSON 뒤 완료를 표시하지 않고 마지막 정상
     });
     assert.equal((failure as Error & { code?: string }).code, 'SSE_MALFORMED_EVENT');
     assert.deepEqual(events.map((event) => event.id), ['1-0']);
-    assert.equal(headers.length, 3);
+    assert.equal(headers.length, 5);
     assert.equal(headers[0].get('Last-Event-ID'), null);
-    assert.equal(headers[1].get('Last-Event-ID'), '1-0');
-    assert.equal(headers[2].get('Last-Event-ID'), '1-0');
-    assert.equal(canceled, 3);
+    assert.ok(headers.slice(1).every((item) => item.get('Last-Event-ID') === '1-0'));
+    assert.equal(canceled, 5);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -3,6 +3,7 @@
 # 결과: 각 API의 명세 응답 또는 한국어 설명을 담은 공통 오류 JSON을 반환한다.
 from contextlib import asynccontextmanager
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from app.match_api import create_match_router
+from app.p1_api import create_p1_router
 from app.simulation_api import create_simulation_router
 from app.simulation_runner import SimulationRunner
 from app.engine_adapter import EngineError
@@ -58,7 +60,8 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
-        if request.url.path.startswith(('/api/personas', '/api/simulations', '/api/matches')):
+        if request.url.path.startswith(('/api/personas', '/api/simulations', '/api/matches', '/api/rules',
+                                        '/api/proposals', '/api/mediation')):
             return error_response(422, 'VALIDATION_ERROR', '요청 JSON의 필드·자료형과 문구 길이를 확인해 주세요.')
         return error_response(422, 'VALIDATION_ERROR', '요청 JSON 형식을 확인해 주세요. 닉네임은 앞뒤 공백을 제외한 1~10자 문자열이어야 해요.')
 
@@ -79,7 +82,10 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
     #서버 응답 확인 코드
     @application.get('/api/health')
     def health():
-        return {'status': 'ok'}
+        # API.md 4.1. engine은 실행 중인 엔진 구현(fake | real) 확인용 추가 필드
+        return {'status': 'ok',
+                'llm': {'provider': os.getenv('LLM_PROVIDER', 'anthropic'), 'model': os.getenv('LLM_MODEL', 'claude-haiku-5-5')},
+                'sim_mode': os.getenv('SIM_MODE', 'agents'), 'engine': os.getenv('ENGINE_IMPL', 'fake')}
 
     @application.post('/api/users', status_code=201, response_model=UserResponse,
                       responses={422: {'model': ErrorResponse}, 500: {'model': ErrorResponse}})
@@ -97,6 +103,7 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
     application.include_router(create_simulation_router(database, seeds, runner,
         replay_path if replay_path is not None else BACKEND_DIR.parent / 'data/replays', ErrorResponse))
     application.include_router(create_match_router(database, ErrorResponse))
+    application.include_router(create_p1_router(database, seeds, ErrorResponse))
     return application
 
 

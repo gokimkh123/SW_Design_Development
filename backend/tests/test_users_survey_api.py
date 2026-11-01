@@ -126,13 +126,13 @@ def test_database_error(setup):
 
 def test_health_docs_and_openapi(setup):
     client, _ = setup
-    assert client.get('/api/health').json() == {'status': 'ok'}
+    assert client.get('/api/health').json()['status'] == 'ok'
     assert client.get('/docs').status_code == 200
     schema = client.get('/openapi.json').json()
     error = schema['paths']['/api/users']['post']['responses']['422']['content']['application/json']['schema']
     assert error['$ref'].endswith('/ErrorResponse')
     with TestClient(app) as default_client:
-        assert default_client.get('/api/health').json() == {'status': 'ok'}
+        assert default_client.get('/api/health').json()['status'] == 'ok'
 
 
 def test_survey_contract_and_engine_compatibility(setup, monkeypatch):
@@ -140,7 +140,7 @@ def test_survey_contract_and_engine_compatibility(setup, monkeypatch):
     response = client.get('/api/survey')
     assert response.status_code == 200
     survey = response.json()
-    assert survey == json.loads(paths['draft_path'].read_text())
+    assert survey == json.loads(paths['draft_path'].read_text(encoding='utf-8'))
     assert survey['version'].startswith('provisional-')
     questions = survey['questions']
     assert [q['question_id'] for q in questions] == [f'q{i:02d}' for i in range(1, 13)]
@@ -158,13 +158,13 @@ def test_survey_contract_and_engine_compatibility(setup, monkeypatch):
                 assert q['options'][index]['style'] == fake_engine.DEFAULT_STYLES[q['question_id']][answers[q['question_id']]]
         assert asyncio.run(fake_engine.build_persona('하늘', answers))['nickname'] == '하늘'
     # 프론트엔드 fixture의 모든 선택값과 순서를 독립적으로 대조한다.
-    source = (BACKEND_DIR.parent / 'frontend/src/mocks/survey.ts').read_text()
+    source = (BACKEND_DIR.parent / 'frontend/src/mocks/survey.ts').read_text(encoding='utf-8')
     assert re.findall(r"value: '([^']+)'", source) == [o['value'] for q in questions[1:] for o in q['options']]
 
 
 def test_official_priority_and_reload(setup):
     client, paths = setup
-    content = json.loads(paths['draft_path'].read_text())
+    content = json.loads(paths['draft_path'].read_text(encoding='utf-8'))
     content['version'] = '2026-10-29'
     content['questions'][0]['title'] = '공식 문구'
     paths['survey_path'].write_text(json.dumps(content))
@@ -180,7 +180,7 @@ def test_official_priority_and_reload(setup):
 def test_broken_official_never_falls_back(setup, damage):
     client, paths = setup
     official = paths['survey_path']
-    content = json.loads(paths['draft_path'].read_text())
+    content = json.loads(paths['draft_path'].read_text(encoding='utf-8'))
     if damage == 'json':
         official.write_text('{')
     elif damage == 'encoding':
@@ -203,7 +203,7 @@ def test_broken_official_never_falls_back(setup, damage):
         elif damage == 'step': q[0]['fields'][0]['step_minutes'] = 15
         official.write_text(json.dumps(content))
     assert_error(client.get('/api/survey'), 500, 'INTERNAL_ERROR')
-    assert client.get('/api/health').json() == {'status': 'ok'}
+    assert client.get('/api/health').json()['status'] == 'ok'
 
 
 @pytest.mark.parametrize('damage', ['missing', 'broken', 'unmarked'])
@@ -213,7 +213,7 @@ def test_unavailable_draft(setup, damage):
     if damage == 'missing': draft.unlink()
     elif damage == 'broken': draft.write_text('{}')
     else:
-        content = json.loads(draft.read_text())
+        content = json.loads(draft.read_text(encoding='utf-8'))
         content['version'] = 'approved'
         draft.write_text(json.dumps(content))
     assert_error(client.get('/api/survey'), 500, 'INTERNAL_ERROR')

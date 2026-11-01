@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 from collections import Counter
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any, AsyncIterator, Iterable
+
+from app.fake_scripts import SCRIPTS
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "data" / "seed"
 
@@ -219,37 +223,96 @@ def _judge(scene: dict, me: dict, candidate: dict) -> str:
     return "negotiated" if gap <= 50 else "conflict"
 
 
+def _delay_seconds() -> float:
+    """발화 간격(초). REPLAY_DELAY_MS(기본 0) 기준, 배포 환경은 대화가 화면에 차례로 보이도록 간격 지정."""
+    try:
+        return max(0.0, float(os.getenv("REPLAY_DELAY_MS", "0")) / 1000)
+    except ValueError:
+        return 0.0
+
+
+def _spoken_time(hhmm: Any) -> str:
+    """'23:30' → '11시 반', '07:00' → '7시'. 형식이 다르면 '그 시간'."""
+    try:
+        hours, minutes = (int(part) for part in str(hhmm).split(":"))
+    except ValueError:
+        return "그 시간"
+    text = f"{hours % 12 or 12}시"
+    return text + (" 반" if minutes == 30 else (f" {minutes}분" if minutes else ""))
+
+
+_PARTICLES = {"은": ("은", "는"), "는": ("은", "는"), "이": ("이", "가"), "가": ("이", "가"),
+              "을": ("을", "를"), "를": ("을", "를"), "과": ("과", "와"), "와": ("과", "와")}
+
+
+def _has_final_consonant(name: str) -> bool:
+    """마지막 글자 받침 여부. 한글 외 글자는 읽는 소리 기준(예: A '에이' → 없음, L '엘' → 있음)."""
+    last = name.strip()[-1:]
+    if "가" <= last <= "힣":
+        return (ord(last) - 0xAC00) % 28 != 0
+    return bool(last) and last.upper() in "LMNR013678"
+
+
+def _situation(template: str, a: str, b: str) -> str:
+    """장면 상황의 {A} · {B}를 이름으로 바꾸고 뒤따르는 조사를 받침에 맞춤 (하늘는 → 하늘은)."""
+    def name_with_particle(match: re.Match) -> str:
+        name = a if match.group(1) == "A" else b
+        with_final, without_final = _PARTICLES[match.group(2)]
+        return name + (with_final if _has_final_consonant(name) else without_final)
+
+    text = re.sub(r"\{([AB])\}(은|는|이|가|을|를|과|와)(?![가-힣])", name_with_particle, template)
+    return text.replace("{A}", a).replace("{B}", b)
+
+
+def _fill(text: str, me: dict, candidate: dict) -> str:
+    """시나리오 치환자({A_bed} 등)를 페르소나의 취침 · 기상 시각으로 변환."""
+    mine, theirs = me.get("sleep") or {}, candidate.get("sleep") or {}
+    return (text.replace("{A_bed}", _spoken_time(mine.get("bedtime")))
+            .replace("{A_wake}", _spoken_time(mine.get("wake")))
+            .replace("{B_bed}", _spoken_time(theirs.get("bedtime")))
+            .replace("{B_wake}", _spoken_time(theirs.get("wake"))))
+
+
 async def simulate(me: dict, candidate: dict, *, mode: str = "agents") -> AsyncIterator[dict]:
-    """장면마다 scene_started → utterance 2개 → scene_judged. mode 는 무시."""
+    """장면마다 scene_started → utterance 4개 → scene_judged. mode 는 무시.
+
+    대화 · 판정 문구는 fake_scripts 의 장면별 시나리오(장면 ID가 없으면 공통 문구), 발화 간격은 REPLAY_DELAY_MS.
+    """
     scenes = load_scenes()
     total = len(scenes)
-    me_name, other_name = f"{me['nickname']} AI", f"{candidate['nickname']} AI"
+    delay = _delay_seconds()
+    speakers = {"A": ("me", f"{me['nickname']} AI"), "B": ("candidate", f"{candidate['nickname']} AI")}
     for index, scene in enumerate(scenes, start=1):
-        situation = scene["situation"].replace("{A}", me["nickname"]).replace("{B}", candidate["nickname"])
         public_scene = {k: scene[k] for k in ("scene_id", "day", "weekday", "time", "category", "title")}
-        public_scene["situation"] = situation
+        public_scene["situation"] = _situation(scene["situation"], me["nickname"], candidate["nickname"])
         yield {"type": "scene_started", "data": {"scene_index": index, "scene": public_scene}}
 
         verdict = _judge(scene, me, candidate)
         agreement, rule_text = _AREA_AGREEMENTS[scene["rule_area"]]
-        lines = [
-            ("me", me_name, f"{scene['title']} 얘기인데, 우리 기준을 한번 맞춰 볼까?"),
-            ("candidate", other_name, "좋아. 나는 이렇게 하면 괜찮을 것 같아." if verdict != "conflict" else "음… 나는 지금 방식이 편한데."),
+        script = SCRIPTS.get(scene["scene_id"], {})
+        variant = script.get(verdict, {})
+        lines = variant.get("lines") or [
+            ("A", f"{scene['title']} 얘기인데, 우리 기준을 한번 맞춰 볼까?"),
+            ("B", "좋아. 나는 이렇게 하면 괜찮을 것 같아." if verdict != "conflict" else "음… 나는 지금 방식이 편한데."),
         ]
-        for turn, (speaker, name, text) in enumerate(lines, start=1):
-            yield {"type": "utterance", "data": {"scene_index": index, "turn": turn, "speaker": speaker, "name": name, "text": text}}
-            await asyncio.sleep(0)
+        for turn, (who, text) in enumerate(lines, start=1):
+            await asyncio.sleep(delay)
+            speaker, name = speakers[who]
+            yield {"type": "utterance", "data": {"scene_index": index, "turn": turn, "speaker": speaker, "name": name,
+                                                 "text": _fill(text, me, candidate)}}
 
+        await asyncio.sleep(delay)
         settled = verdict != "conflict"
         yield {
             "type": "scene_judged",
             "data": {
                 "scene_index": index,
                 "verdict": verdict,
-                "reason": _VERDICT_REASONS[verdict],
-                "agreement": agreement,  # 충돌 장면도 판정자의 합의안 제시 (PRD 5장 판정 정의)
-                "rule_candidate": {"area": scene["rule_area"], "text": rule_text},
-                "unresolved": None if settled else f"{scene['title']} 기준 차이",
+                "reason": variant.get("reason", _VERDICT_REASONS[verdict]),
+                # 충돌 장면도 판정자의 합의안 제시 (PRD 5장 판정 정의)
+                "agreement": variant.get("agreement", agreement),
+                "rule_candidate": {"area": scene["rule_area"], "text": script.get("rule", rule_text)},
+                "unresolved": None if settled else variant.get("unresolved", f"{scene['title']} 기준 차이"),
                 "progress": {"done": index, "total": total},
             },
         }
@@ -295,15 +358,69 @@ async def draft_rules(me: dict, candidate: dict, judgements: list[dict]) -> list
     return rules
 
 
+# 규칙 수정 중재: 제안을 받아들이되 상대 생활 성향을 고려한 보완 조건을 덧붙임 (FR-C5)
+_MEDIATION_CONDITIONS = {
+    "quiet_hours": "상대가 일찍 자야 하는 날은 전날 미리 알리기",
+    "guests": "방문 하루 전 서로 확인하기",
+    "cleaning": "주 1회 함께 상태 점검하기",
+    "fridge": "공용 칸은 주말에 함께 정리하기",
+    "climate": "취침 시간에는 23도 유지하기",
+    "supplies": "구매 내역은 정산 앱에 기록하기",
+}
+_AREA_AXES = {"quiet_hours": "sleep_rhythm", "guests": "sociability", "cleaning": "cleanliness",
+              "fridge": "sharing_tolerance", "climate": "sleep_rhythm", "supplies": "sharing_tolerance"}
+_AXIS_NAMES = {"sleep_rhythm": "수면 리듬", "noise_sensitivity": "소음 민감", "cleanliness": "청결",
+               "sociability": "사교성", "sharing_tolerance": "공유 성향"}
+
+
+def _short(text: str, limit: int = 40) -> str:
+    text = " ".join(str(text).split())
+    return text if len(text) <= limit else text[:limit - 1] + "…"
+
+
 async def mediate(rule: dict, proposal_text: str, reason: str, proposer: dict, other: dict) -> dict:
+    area = rule.get("area", "quiet_hours")
+    axis = _AREA_AXES.get(area, "sleep_rhythm")
+    other_label = (other.get("axis_labels") or {}).get(axis, "보통")
+    condition = _MEDIATION_CONDITIONS.get(area, "서로 불편한 점은 미리 알리기")
     return {
-        "text": f"{proposal_text}, 대신 상대가 불편한 시간대는 서로 미리 알리기",
-        "rationale": [f"{proposer['nickname']}의 사유: {reason}", f"기존 규칙({rule['text']})의 취지 유지"],
+        "text": f"{_short(proposal_text, 60)}, 대신 {condition}",
+        "rationale": [
+            f"제안 사유 반영: {_short(reason)}",
+            f"상대의 {_AXIS_NAMES[axis]}({other_label})을 고려한 보완 조건 추가",
+            f"기존 규칙의 취지 유지: {_short(rule.get('text', ''))}",
+        ],
     }
 
 
+# 불편 전하기: 메모 원문은 쓰지 않고 주제만 파악해 요청형 문장과 재발 방지 규칙 제안 (FR-D1)
+_MEMO_TOPICS = (
+    ("quiet_hours", ("알람", "통화", "게임", "소리", "소음", "시끄", "새벽", "음악", "키보드", "잠", "조명", "불빛"),
+     "요즘 밤이나 아침 시간에 소리 때문에 잠을 조금 설치고 있어 😅 서로 편하게 쉴 수 있게 시간대를 같이 정해 볼 수 있을까?",
+     "평일 23:30 이후 소리 줄이기 · 알람은 진동"),
+    ("cleaning", ("설거지", "청소", "머리카락", "쓰레기", "냄새", "빨래", "먼지", "분리수거"),
+     "요즘 방 정리가 조금 밀린 것 같아서 🧹 당번이나 정리 시간을 같이 정해 볼까?",
+     "설거지는 당일 · 일요일 오후 함께 청소"),
+    ("fridge", ("냉장고", "반찬", "음식", "간식", "우유", "먹"),
+     "냉장고 음식이 가끔 헷갈려서 🙂 칸을 나눠 쓰고, 나눠 먹을 땐 서로 물어보면 어떨까?",
+     "냉장고 칸 나누기 · 공용 칸 주 1회 정리"),
+    ("guests", ("친구", "손님", "방문", "애인", "연인", "초대"),
+     "방에 손님이 올 때 미리 알려 주면 나도 준비할 수 있어서 좋을 것 같아 🙏 시간도 같이 정해 볼까?",
+     "친구 초대는 하루 전 공지 · 22시까지"),
+    ("climate", ("난방", "에어컨", "온도", "춥", "덥", "창문", "환기"),
+     "방 온도가 서로 조금 안 맞는 것 같아서 🌡️ 둘 다 편한 온도를 같이 정해 볼까?",
+     "취침 시간 23도 · 외출 시 끄기"),
+    ("supplies", ("휴지", "세제", "공용", "물건", "드라이기", "빌려", "정산", "돈"),
+     "공용품이랑 물건 쓰는 기준을 한번 정해 두면 서로 편할 것 같아 🙂 같이 이야기해 볼래?",
+     "공용품 번갈아 구매 · 개인 물건은 묻고 쓰기"),
+)
+
+
 async def rephrase(memo: str, sender: dict, receiver: dict) -> dict:
+    for area, keywords, message, rule_text in _MEMO_TOPICS:
+        if any(keyword in memo for keyword in keywords):
+            return {"message": message, "suggested_rule": {"area": area, "text": rule_text}}
     return {
-        "message": "요즘 조금 신경 쓰이는 게 있어서 😅 같이 방법을 정해 볼 수 있을까?",
-        "suggested_rule": {"area": "quiet_hours", "text": "서로 불편한 점은 그날 안에 부드럽게 말하기"},
+        "message": "요즘 조금 신경 쓰이는 게 있어서 😅 서로 편한 방법을 같이 정해 볼 수 있을까?",
+        "suggested_rule": {"area": "quiet_hours", "text": "불편한 점은 그날 안에 부드럽게 말하기"},
     }
