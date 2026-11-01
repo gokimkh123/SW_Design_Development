@@ -438,6 +438,28 @@ def list_events(db_path, simulation_id, *, after_event_id=None, user_id=None):
                 'WHERE simulation_id=? AND sequence>? ORDER BY sequence', (simulation_id, sequence))]
 
 
+def read_event_batch(db_path, simulation_id, *, after_event_id=None, user_id, limit=64):
+    """이미 초기화된 DB에서 상태와 한 페이지를 같은 스냅샷으로 읽고 연결을 닫는다."""
+    with connect_database(db_path) as db:
+        db.row_factory = sqlite3.Row
+        db.execute('BEGIN')
+        row = _run(db, simulation_id, user_id)
+        if row is None:
+            return None
+        sequence = 0
+        if after_event_id is not None:
+            cursor = db.execute('SELECT sequence FROM simulation_events WHERE simulation_id=? AND event_id=?',
+                                (simulation_id, after_event_id)).fetchone()
+            if cursor is None:
+                raise ValueError('이 실행에 없는 이벤트 ID입니다.')
+            sequence = cursor[0]
+        events = [_event_value(r) for r in db.execute(
+            'SELECT event_id, sequence, type, data FROM simulation_events '
+            'WHERE simulation_id=? AND sequence>? ORDER BY sequence LIMIT ?',
+            (simulation_id, sequence, limit))]
+        return row['status'], events
+
+
 def list_scenes(db_path, simulation_id, *, user_id=None):
     with _connection(db_path) as db:
         if _run(db, simulation_id, user_id) is None:
