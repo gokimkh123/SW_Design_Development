@@ -79,18 +79,18 @@ export function ComparisonScreen({ personaId, onViewCandidate, onCandidateSelect
     {actionError && <ErrorMessage message={actionError} />}
     {!comparison && !error && <LoadingMessage />}
     {comparison?.candidates.length === 0 && <ErrorMessage message="비교할 후보가 없어요. 후보 목록을 다시 확인해 주세요." />}
-    {statusError && <p className="extra-muted" role="status">점수 출처 확인 실패 · 점수 종류를 확인할 수 없어 표기를 보류했어요.</p>}
+    
     {comparison && selected && <>
       <section className="flow-card extra-radar-card"><h2>나와 후보 3명의 생활 성향</h2><Radar me={comparison.me.axes} candidates={comparison.candidates} selectedId={candidateId} /></section>
       <section className="flow-card extra-rank-card"><h2>후보별 궁합</h2>
         {comparison.candidates.map((candidate, index) => <button type="button" className={`extra-rank-row ${candidateId === candidate.candidate_id ? 'is-selected' : ''}`} key={candidate.candidate_id} disabled={actionBusy} onClick={() => { setCandidateId(candidate.candidate_id); onCandidateSelected(); }} aria-pressed={candidateId === candidate.candidate_id}>
           <span className={`flow-avatar flow-avatar--${index}`}>{candidate.alias.slice(-1)}</span>
-          <span className="extra-rank-copy"><strong>{candidate.alias}</strong><small>월 예상 갈등 {candidate.expected_conflicts_per_month == null ? '산식 미확정' : `${candidate.expected_conflicts_per_month}회${isMock ? ' · 임시 예시' : ' · 추정치'}`}</small></span>
-          <span className="extra-rank-score"><strong>{candidate.score}점</strong><small>{candidateStatuses?.find(item => item.candidate_id === candidate.candidate_id)?.simulation?.status === 'completed' ? '시뮬레이션' : candidateStatuses?.some(item => item.candidate_id === candidate.candidate_id) ? '1차 궁합' : statusError ? '출처 확인 실패' : '출처 확인 중'}</small></span>
+          <span className="extra-rank-copy"><strong>{candidate.alias}</strong><small>{candidate.expected_conflicts_per_month == null ? '시뮬레이션 후 월 예상 갈등 표시' : `월 예상 갈등 ${candidate.expected_conflicts_per_month}회${isMock ? ' · 임시 예시' : ' · 추정치'}`}</small></span>
+          <span className="extra-rank-score"><strong>{candidate.score}점</strong><small>{candidateStatuses?.find(item => item.candidate_id === candidate.candidate_id)?.simulation?.status === 'completed' ? '시뮬레이션' : candidateStatuses?.some(item => item.candidate_id === candidate.candidate_id) ? '1차 궁합' : statusError ? '' : '확인 중'}</small></span>
         </button>)}
       </section>
       <p className="extra-muted">점수는 함께 사는 결과를 보장하지 않는 참고값입니다. 매칭 신청은 해당 후보의 완료된 리포트에서 할 수 있어요.</p>
-      <div className="flow-footer"><button className="flow-button" type="button" disabled={actionBusy} onClick={() => onViewCandidate(selected.candidate_id)}>{actionBusy ? '리포트 확인 중…' : `${selected.alias} 리포트에서 신청하기`}</button></div>
+      <div className="flow-footer"><button className="flow-button" type="button" disabled={actionBusy} onClick={() => onViewCandidate(selected.candidate_id)}>{actionBusy ? '확인 중…' : candidateStatuses?.find(item => item.candidate_id === selected.candidate_id)?.simulation?.status === 'completed' ? `${selected.alias} 리포트에서 신청하기` : `${selected.alias}와 가상 동거 시작`}</button></div>
     </>}
   </div>;
 }
@@ -157,10 +157,11 @@ export function MemoScreen({ matchId, onKeepPrivate, isMock }: { matchId: string
   const [result, setResult] = useState<RephraseResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const remaining = useMemo(() => 500 - memo.length, [memo]);
   async function rephrase() {
     if (!memo.trim() || busy) return;
-    setBusy(true); setError(''); setResult(null);
+    setBusy(true); setError(''); setResult(null); setCopied(false);
     try { setResult(await api.rephraseMemo(matchId, memo.trim())); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '메시지 변환에 실패했어요.'); }
     finally { setBusy(false); }
@@ -168,8 +169,8 @@ export function MemoScreen({ matchId, onKeepPrivate, isMock }: { matchId: string
   return <div className="flow-screen extra-screen"><p className="flow-lead">조심스럽게 말하고 싶은 게 있나요?</p><p className="extra-muted">메모 원문은 상대에게 전달되지 않아요. 이 화면을 떠나면 입력 내용도 지워집니다.</p>
     {isMock && <p className="extra-preview">시안 미리보기 · 변환 문장과 규칙 제안은 임시 예시예요.</p>}
     <section className="flow-card extra-form"><h2>나만 보이는 메모</h2><label htmlFor="private-memo">편하게 적어 주세요</label><textarea id="private-memo" value={memo} disabled={busy} onChange={event => { setMemo(event.target.value); setResult(null); }} maxLength={500} rows={5} placeholder="불편했던 일을 적어 주세요" /><small>{remaining}자 남음</small><button type="button" className="flow-button" disabled={!memo.trim() || busy} onClick={() => void rephrase()}>{busy ? '다듬는 중…' : '요청형 문장으로 다듬기'}</button></section>
-    {result && <><section className="flow-card extra-message"><small>상대에게 보낼 메시지 미리보기</small><p>{result.message}</p></section><section className="flow-card extra-message"><small>함께 제안할 생활 규칙</small><p>{result.suggested_rule.text}</p></section><p className="extra-muted">현재 명세에는 메시지 전송 API가 없습니다. 아래 화면은 확인용이며, 상대에게 전송되지 않습니다.</p></>}
+    {result && <><section className="flow-card extra-message"><small>상대에게 보낼 메시지 미리보기</small><p>{result.message}</p></section><section className="flow-card extra-message"><small>함께 제안할 생활 규칙</small><p>{result.suggested_rule.text}</p></section><p className="extra-muted">메모 원문은 저장되지 않아요. 다듬어진 문장만 복사해 직접 전할 수 있어요.</p></>}
     {error && <ErrorMessage message={error} />}
-    <div className="flow-footer"><button type="button" className="flow-button flow-button--secondary" onClick={onKeepPrivate}>그냥 둘게요</button><button type="button" className="flow-button" disabled title="전송 API가 정해진 뒤 사용할 수 있어요">보내기 · 연동 대기</button></div>
+    <div className="flow-footer"><button type="button" className="flow-button flow-button--secondary" onClick={onKeepPrivate}>그냥 둘게요</button><button type="button" className="flow-button" disabled={!result} onClick={() => { if (result) void navigator.clipboard?.writeText(result.message).then(() => setCopied(true)).catch(() => setCopied(false)); }}>{copied ? '복사했어요 ✓' : '다듬은 문장 복사'}</button></div>
   </div>;
 }

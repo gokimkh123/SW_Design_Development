@@ -186,3 +186,19 @@
   .flow-score-ring::before { width: 61px; height: 61px; }
   .flow-score-ring strong { font-size: 22px; }
 }
+
+/* 발표회 보완(11/1): 시뮬레이션 진행 막대 고정, iOS 입력 확대 방지(16px), 작은 글자 · 대비 보강 */
+.flow-sim-progress { position: sticky; top: -12px; z-index: 1; display: grid; gap: 8px; margin: -12px -22px 0; padding: 12px 22px 10px; background: #f1f3f5; }
+.flow-input, .flow-edit textarea, .extra-form input, .extra-form textarea { font-size: 16px; }
+.flow-axis { grid-template-columns: 128px 1fr; font-size: 12px; }
+.flow-muted, .flow-progress-meta { color: #5f6b77; }
+.flow-progress-meta { font-size: 13px; }
+.flow-button:not(.flow-button--secondary) { background: #0b8578; }
+.flow-scene-situation small, .flow-bubble strong, .flow-report-score > div:last-child small, .flow-legend,
+.flow-highlight small, .flow-verdict-tag, .flow-rule small, .flow-candidate-score span { font-size: 11.5px; }
+.flow-bubble strong, .flow-rule small, .flow-highlight small { color: #66737e; }
+.flow-scene-situation p { font-size: 13px; }
+.flow-bubble p { font-size: 13.5px; }
+.flow-verdict { font-size: 13px; }
+.flow-verdict small.flow-rule-saved { margin-top: 4px; color: #0b7d72; font-weight: 700; }
+.flow-verdict small.flow-rule-open { margin-top: 4px; color: #b23a4a; font-weight: 700; }

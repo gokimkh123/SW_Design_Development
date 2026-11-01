@@ -10,6 +10,8 @@ type AppShellProps = {
   onBack?: () => void;
   activeTab?: AppTab;
   enabledTabs?: AppTab[];
+  /** 표시할 탭 (기본: 전체). 발표회 범위 밖 탭은 숨김 */
+  visibleTabs?: AppTab[];
   onTabChange?: (tab: AppTab) => void;
   footer?: ReactNode;
   className?: string;
@@ -22,7 +24,8 @@ const tabs: { id: AppTab; label: string; icon: string }[] = [
   { id: 'all', label: '전체', icon: '☷' },
 ];
 
-export function AppShell({ children, title, subtitle, showBack = false, onBack, activeTab, enabledTabs, onTabChange, footer, className = '' }: AppShellProps) {
+export function AppShell({ children, title, subtitle, showBack = false, onBack, activeTab, enabledTabs, visibleTabs, onTabChange, footer, className = '' }: AppShellProps) {
+  const shownTabs = visibleTabs ? tabs.filter((tab) => visibleTabs.includes(tab.id)) : tabs;
   return (
     <div className={`app-shell ${className}`}>
       {(title || showBack) && (
@@ -41,8 +44,8 @@ export function AppShell({ children, title, subtitle, showBack = false, onBack, 
       <main className="app-content">{children}</main>
       {footer ? <div className="app-footer">{footer}</div> : null}
       {activeTab ? (
-        <nav className="bottom-nav" aria-label="주 메뉴">
-          {tabs.map((tab) => {
+        <nav className="bottom-nav" aria-label="주 메뉴" style={{ gridTemplateColumns: `repeat(${shownTabs.length}, 1fr)` }}>
+          {shownTabs.map((tab) => {
             const enabled = enabledTabs?.includes(tab.id) ?? activeTab === tab.id;
             return (
             <button

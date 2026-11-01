@@ -9,7 +9,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app import simulations as store
 
-POLL_SECONDS = 0.5
+POLL_SECONDS = 0.2
 HEARTBEAT_SECONDS = 15
 logger = logging.getLogger(__name__)
 ERROR_MESSAGES = {

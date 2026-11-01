@@ -113,7 +113,7 @@ def test_url_writes_only_to_priority_database(monkeypatch, tmp_path):
 
 
 def test_docker_copy_layout_survey(tmp_path):
-    dockerfile = (BACKEND_DIR / 'Dockerfile').read_text()
+    dockerfile = (BACKEND_DIR / 'Dockerfile').read_text(encoding='utf-8')
     assert 'COPY backend/app ./app' in dockerfile
     assert 'COPY data /srv/data' in dockerfile
     root = tmp_path / 'srv'
@@ -132,7 +132,7 @@ import json
 from fastapi.testclient import TestClient
 from app.main import app
 with TestClient(app, raise_server_exceptions=False) as client:
-    assert client.get('/api/health').json() == {'status': 'ok'}
+    assert client.get('/api/health').json()['status'] == 'ok'
     response = client.get('/api/survey')
     print(json.dumps({'status': response.status_code, 'body': response.json()}))
 """
@@ -143,7 +143,7 @@ with TestClient(app, raise_server_exceptions=False) as client:
                                 check=True, capture_output=True, text=True)
         return json.loads(result.stdout)
 
-    expected = json.loads(draft.read_text())
+    expected = json.loads(draft.read_text(encoding='utf-8'))
     assert request() == {'status': 200, 'body': expected}
     expected['version'] = 'official-test'
     official.write_text(json.dumps(expected))

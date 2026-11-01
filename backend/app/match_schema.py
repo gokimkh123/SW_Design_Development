@@ -1,5 +1,5 @@
 # 기능: 매칭과 생활 규칙의 추가 스키마를 정의한다.
-# 시스템 범위: 공통 DB 초기화에서 사용하는 내부 DDL이며 P1 수정 제안은 제외한다.
+# 시스템 범위: 공통 DB 초기화에서 사용하는 내부 DDL이다. P1 규칙 수정 제안 테이블을 포함한다.
 # 결과: 시뮬레이션당 매칭 1건, 매칭·영역당 규칙 1개, 양측 동의와 확정 상태의 일치를 보장한다.
 SCHEMAS = {
     'matches': '''CREATE TABLE matches (
@@ -27,5 +27,16 @@ SCHEMAS = {
         source_verdict TEXT NOT NULL CHECK (source_verdict IN ('harmonious', 'negotiated', 'conflict', 'pending')),
         UNIQUE (match_id, area),
         UNIQUE (match_id, position)
+    )''',
+    # P1 규칙 수정 제안 (API.md 4.16). 수락 시 rules.text를 중재안으로 바꾼다. 신규 테이블은 기존 DB에 자동 생성
+    'rule_proposals': '''CREATE TABLE rule_proposals (
+        proposal_id TEXT NOT NULL PRIMARY KEY,
+        rule_id TEXT NOT NULL REFERENCES rules(rule_id),
+        user_id TEXT NOT NULL REFERENCES users(user_id),
+        text TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        mediation TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('proposed', 'accepted')),
+        created_at TEXT NOT NULL
     )''',
 }

@@ -24,6 +24,9 @@ from app.simulation_stream import stream_events
 from app.simulation_report import Report, get_report
 
 
+MAX_ACTIVE_SIMULATIONS = 30
+
+
 class SimulationCreate(BaseModel):
     model_config = ConfigDict(strict=True, extra='forbid')
     persona_id: str = Field(min_length=1)
@@ -103,7 +106,7 @@ def create_simulation_router(database, seeds, runner, replay_path, error_model):
         card = next((c for c in cards if c.candidate_id == payload.candidate_id), None)
         if card is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '선택할 수 있는 후보를 찾을 수 없어요.')
-        candidate = next(c for c in json.loads(seeds.read_text())['personas']
+        candidate = next(c for c in json.loads(seeds.read_text(encoding='utf-8'))['personas']
                          if c['persona_id'] == card.candidate_id)
         # 저장소에는 리플레이 파일·파일명·스키마 계약이 아직 없다.
         if payload.mode == 'replay' and replay_path.exists() and any(
@@ -118,6 +121,10 @@ def create_simulation_router(database, seeds, runner, replay_path, error_model):
         if not created:
             response.status_code = 200
             return sim
+        # 동시 실행 상한: 초과분은 실패로 기록해 같은 후보로 다시 시작할 수 있게 함
+        if len(runner.tasks) >= MAX_ACTIVE_SIMULATIONS:
+            runner.fail(sim['simulation_id'], '동시 실행 한도를 넘었습니다.', 'LLM_RATE_LIMITED', True)
+            raise PersonaAPIError(429, 'LLM_RATE_LIMITED', '지금 체험하는 분이 많아요. 잠시 후 다시 시작해 주세요.')
         try:
             runner.launch(sim['simulation_id'], engine)
         except BaseException:

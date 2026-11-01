@@ -215,7 +215,7 @@ def test_real_http_live_independent_subscribers_and_disconnect(start_context, mo
                         break
                     received.extend(parse(frame))
                 assert received[-1]['event'] == 'simulation_completed'
-                assert len(received) == 81
+                assert len(received) == 20 * 6 + 1  # 장면당 scene_started · 발화 4개 · scene_judged, 완료 1개
                 assert [e['id'] for e in received] == [e['id'] for e in store.list_events(db, sid)[1:]]
             assert impl.calls == 1
         assert active == 0

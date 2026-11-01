@@ -68,7 +68,7 @@ def test_ranking_contract_privacy_and_stability(setup):
         assert card['simulation'] is None
         assert card['department'] == '테스트학과' and card['year'] == 1
     assert '비공개' not in response.text and 'private.png' not in response.text
-    data = json.loads(setup[2].read_text())['personas']
+    data = json.loads(setup[2].read_text(encoding='utf-8'))['personas']
     write_seeds(setup, list(reversed(data)))
     assert request(setup).json() == response.json()
 
@@ -187,7 +187,8 @@ def test_openapi(setup):
     assert any(p['name'] == 'X-User-Id' for p in operation['parameters'])
     assert {'200', '401', '404', '422', '500'} <= operation['responses'].keys()
     fields = schema['components']['schemas']['CandidateResponse']['properties']
-    assert fields['simulation']['type'] == 'null'
+    # 후보별 최근 실행 상태 또는 null (API.md 3 Candidate.simulation)
+    assert {'type': 'null'} in fields['simulation']['anyOf']
     assert 'nickname' not in fields
 
 

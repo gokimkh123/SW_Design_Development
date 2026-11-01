@@ -23,7 +23,7 @@ from app.users import create_user, get_user
 @pytest.fixture
 def context(tmp_path):
     path = tmp_path / 'simulation.db'
-    seeds = json.loads((Path(__file__).resolve().parents[2] / 'data/seed/personas.json').read_text())['personas']
+    seeds = json.loads((Path(__file__).resolve().parents[2] / 'data/seed/personas.json').read_text(encoding='utf-8'))['personas']
     seed = deepcopy(next(s for s in seeds if s['candidate_pool']))
     me = seeds[0]
     user = create_user(path, '테스터')
@@ -47,7 +47,8 @@ def engine_events(path, sid):
     async def collect():
         return [e async for e in load_engine('fake').simulate(inputs['me'], inputs['candidate'],
                                                              mode=inputs['engine_mode'])]
-    return asyncio.run(collect())
+    # 저장 계약 검사는 장면당 scene_started · 발화 2개(turn 1 · 2) · scene_judged 배치 기준
+    return [e for e in asyncio.run(collect()) if e['type'] != 'utterance' or e['data']['turn'] <= 2]
 
 
 def finish_scenes(path, sid):
@@ -151,7 +152,7 @@ def test_full_fake_event_contract_idempotence_and_completion(context):
     scenes = store.list_scenes(path, sid)
     assert [s['scene_index'] for s in scenes] == list(range(1, 21))
     assert all(len(s['dialogue']) == 2 for s in scenes)
-    assert all(s['dialogue'][1]['name'] == '후보 A AI' for s in scenes)
+    assert all('후보 A AI' in {d['name'] for d in s['dialogue']} for s in scenes)
     completed = store.complete_simulation(path, sid, score=80, headline='저장된 결과', report={'summary': '리포트'})
     assert store.complete_simulation(path, sid, score=80, headline='저장된 결과', report={'summary': '리포트'}) == completed
     assert store.save_event(path, sid, events[-1])['type'] == 'scene_judged'

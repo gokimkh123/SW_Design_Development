@@ -474,6 +474,16 @@ def list_scenes(db_path, simulation_id, *, user_id=None):
         return result
 
 
+def latest_by_candidate(db_path, persona_id, *, user_id):
+    """후보 ID → 가장 최근 실행의 공개 Simulation. 실패 후 다시 시작하면 새 실행이 대표가 된다."""
+    with _connection(db_path) as db:
+        latest = {}
+        for row in db.execute('SELECT * FROM simulations WHERE persona_id=? AND user_id=? '
+                              'ORDER BY created_at, rowid', (persona_id, user_id)):
+            latest[row['candidate_id']] = _simulation(db, row)
+        return latest
+
+
 def get_completion(db_path, simulation_id, *, user_id=None):
     """완료 결과만 반환. 없는/다른 소유자 실행은 None, 미완료는 StorageConflictError."""
     with _connection(db_path) as db:
