@@ -15,7 +15,7 @@
 .extra-radar-card h2, .extra-rank-card h2 { margin-bottom: 10px; }
 .extra-radar-wrap { width: 100%; }
 .extra-radar { display: block; width: 100%; max-height: 255px; }
-.extra-radar-label { fill: #62717d; font: 600 11px -apple-system, BlinkMacSystemFont, sans-serif; }
+.extra-radar-label { fill: #62717d; font: 600 11px "Pretendard Variable", Pretendard, -apple-system, sans-serif; }
 .extra-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 13px; margin-top: -2px; color: #667884; font-size: 11px; }
 .extra-legend span { display: inline-flex; align-items: center; gap: 7px; }
 .extra-legend span.is-selected { color: #253944; font-weight: 800; }

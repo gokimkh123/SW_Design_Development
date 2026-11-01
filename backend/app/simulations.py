@@ -25,6 +25,14 @@ class StorageConflictError(ValueError):
     """상태·순서 또는 동일 재시도 키의 내용이 기존 데이터와 충돌한다."""
 
 
+class SimulationLimitError(RuntimeError):
+    """동시 실행 한도 초과. scope: 'user'(사용자별) 또는 'total'(서버 전체). 새 실행은 기록하지 않는다."""
+
+    def __init__(self, scope: str):
+        super().__init__(scope)
+        self.scope = scope
+
+
 class EventData(BaseModel):
     model_config = ConfigDict(strict=True, extra='forbid')
 
@@ -166,7 +174,8 @@ def _simulation(db, row):
 
 def create_or_reuse_simulation(db_path: Path, *, user_id: str, persona_id: str,
                                candidate: dict, alias: str, scenes: list[dict],
-                               mode: str = 'live') -> tuple[dict, bool]:
+                               mode: str = 'live', max_running_per_user: int | None = None,
+                               max_running_total: int | None = None) -> tuple[dict, bool]:
     """실제 API 모드를 받아 (공개 Simulation, created)를 반환한다.
 
     시드는 검증·선정한 원본 dict, DB 후보는 persona_id/is_seed=false를 전달한다.
@@ -186,6 +195,14 @@ def create_or_reuse_simulation(db_path: Path, *, user_id: str, persona_id: str,
             if existing['status'] == 'queued':
                 raise StorageConflictError('대기 실행이 이미 예약되어 있습니다. 실행기 정책을 확인하세요.')
             return _simulation(db, existing), False
+        # 한도는 같은 쓰기 트랜잭션 안에서 확인해 동시 요청에도 초과하지 않고, 초과 시 행을 남기지 않음
+        if max_running_per_user is not None and db.execute(
+                "SELECT COUNT(*) FROM simulations WHERE user_id=? AND status='running'",
+                (user_id,)).fetchone()[0] >= max_running_per_user:
+            raise SimulationLimitError('user')
+        if max_running_total is not None and db.execute(
+                "SELECT COUNT(*) FROM simulations WHERE status='running'").fetchone()[0] >= max_running_total:
+            raise SimulationLimitError('total')
         if candidate.get('is_seed') is not True:
             candidate = _persona(db, candidate_id)
         else:
