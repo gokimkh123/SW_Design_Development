@@ -165,6 +165,14 @@ export interface RephraseResult {
   suggested_rule: { area: string; text: string };
 }
 
+/** 멤버십 사전 구독 신청 (API.md 4.17). 결제 미연동 · 플랜만 기록 */
+export type SubscriptionPlan = 'plus_monthly' | 'plus_semester' | 'dorm';
+
+export interface Subscription {
+  plan: SubscriptionPlan | null;
+  updated_at: string | null;
+}
+
 export type SimulationEvent =
   | { id: string; type: 'simulation_started'; data: { simulation_id: string; mode: SimulationMode; total_scenes: number; me: { name: string; type_name: string }; candidate: { alias: string; type_name: string } } }
   | { id: string; type: 'scene_started'; data: { scene_index: number; scene: Scene } }
@@ -193,5 +201,8 @@ export interface ApiClient {
   proposeRule(ruleId: string, proposal: { text: string; reason: string }): Promise<RuleProposal>;
   acceptProposal(proposalId: string): Promise<Rule>;
   rephraseMemo(matchId: string, memo: string): Promise<RephraseResult>;
+  getSubscription(): Promise<Subscription>;
+  saveSubscription(plan: SubscriptionPlan): Promise<Subscription>;
+  cancelSubscription(): Promise<Subscription>;
   subscribeSimulation(id: string, onEvent: (event: SimulationEvent) => void, onError: (error: Error) => void): () => void;
 }

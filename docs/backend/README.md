@@ -545,3 +545,14 @@ ENGINE_IMPL=fake .venv/bin/python -m pytest tests -q
 - 가짜 엔진: 장면별 대화 시나리오(`app/fake_scripts.py`, 장면 20개 × 판정 3종 × 발화 4개), `REPLAY_DELAY_MS` 간격으로 발화 전송(기본 0, 배포 600ms)
 - SSE 조회 간격 0.2초, 의존성 버전 고정(`requirements.txt`)
 
+
+## 멤버십 사전 구독 신청 (11/1)
+
+| 경로 | 내용 |
+| --- | --- |
+| `GET /api/subscriptions/me` | 내 신청 플랜 조회. 미신청 시 `plan: null` |
+| `PUT /api/subscriptions/me` | 플랜 신청 · 변경(`plus_monthly` · `plus_semester` · `dorm`), 사용자당 1건 |
+| `DELETE /api/subscriptions/me` | 신청 취소, 반복 호출 안전 |
+
+- 결제 미연동: 카드 · 계좌 · 연락처를 받지 않고 `subscription_intents`(user_id, plan, 시각)만 저장. 신규 테이블은 기존 DB에 자동 생성
+- 정의되지 않은 플랜 · 추가 필드는 422, 사용자 ID 없음 · 미등록은 401 (`app/subscription_api.py`, `tests/test_subscriptions_api.py`)

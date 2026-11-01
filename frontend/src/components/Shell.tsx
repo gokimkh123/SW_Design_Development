@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type AppTab = 'room' | 'match' | 'persona' | 'all';
+export type AppTab = 'room' | 'match' | 'persona' | 'plans' | 'all';
 
 type AppShellProps = {
   children: ReactNode;
@@ -21,13 +21,14 @@ const tabs: { id: AppTab; label: string; icon: string }[] = [
   { id: 'room', label: '우리 방', icon: '⌂' },
   { id: 'match', label: '매칭', icon: '♧' },
   { id: 'persona', label: '페르소나', icon: '✧' },
+  { id: 'plans', label: '멤버십', icon: '◇' },
   { id: 'all', label: '전체', icon: '☷' },
 ];
 
 export function AppShell({ children, title, subtitle, showBack = false, onBack, activeTab, enabledTabs, visibleTabs, onTabChange, footer, className = '' }: AppShellProps) {
   const shownTabs = visibleTabs ? tabs.filter((tab) => visibleTabs.includes(tab.id)) : tabs;
   return (
-    <div className={`app-shell ${className}`}>
+    <div className={`app-shell ${activeTab ? 'has-nav' : ''} ${className}`}>
       {(title || showBack) && (
         <header className="app-header">
           {showBack ? (
@@ -45,6 +46,7 @@ export function AppShell({ children, title, subtitle, showBack = false, onBack, 
       {footer ? <div className="app-footer">{footer}</div> : null}
       {activeTab ? (
         <nav className="bottom-nav" aria-label="주 메뉴" style={{ gridTemplateColumns: `repeat(${shownTabs.length}, 1fr)` }}>
+          <div className="side-brand" aria-hidden="true"><span>🛏️</span><div><strong>룸메궁합</strong><small>AI 가상 동거 룸메이트 매칭</small></div></div>
           {shownTabs.map((tab) => {
             const enabled = enabledTabs?.includes(tab.id) ?? activeTab === tab.id;
             return (
@@ -61,6 +63,7 @@ export function AppShell({ children, title, subtitle, showBack = false, onBack, 
               <span>{tab.label}</span>
             </button>
           );})}
+          <p className="side-foot">휴대폰에서도 같은 주소로 이용할 수 있어요.</p>
         </nav>
       ) : null}
     </div>
