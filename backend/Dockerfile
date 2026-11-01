@@ -11,4 +11,5 @@ COPY engine /srv/engine
 COPY data /srv/data
 COPY backend/app ./app
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 동시 연결 상한(SSE 포함): 과도한 연결로 스레드가 고갈되기 전에 503으로 거절
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--limit-concurrency", "300"]

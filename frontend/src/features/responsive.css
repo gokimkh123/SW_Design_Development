@@ -42,7 +42,7 @@
   /* 왼쪽 메뉴 (모바일 하단 탭과 같은 항목) */
   .bottom-nav { grid-area: nav; display: flex; flex-direction: column; gap: 4px; min-height: 0; padding: 28px 18px 24px; border-top: 0; border-right: 1px solid #e5e9ed; background: #fff; }
   .side-brand { display: flex; align-items: center; gap: 12px; margin: 0 6px 26px; }
-  .side-brand > span { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 14px; background: #d9f4ee; font-size: 23px; }
+  .side-brand > span { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 14px; background: #d9f4ee; color: #0b8578; font-size: 23px; }
   .side-brand strong { display: block; color: #13202a; font-size: 19px; font-weight: 850; letter-spacing: -.03em; }
   .side-brand small { color: #6b7680; font-size: 12px; }
   .bottom-nav-item { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 48px; padding: 0 14px; border-radius: 12px; color: #4b5864; font-size: 15px; font-weight: 750; }

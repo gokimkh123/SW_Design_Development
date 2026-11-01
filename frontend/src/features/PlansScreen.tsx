@@ -113,7 +113,7 @@ export function PlansScreen() {
     </section>
     </div>
 
-    {error && <p className="extra-error" role="alert">{error}</p>}
+    {error && !pending && <p className="extra-error" role="alert">{error}</p>}
     <p className="flow-notice">플러스 · 생활관 요금제는 지금 사전 신청을 받고 있어요. 정식 출시 전까지는 결제 없이 모든 기능을 이용할 수 있어요.</p>
 
     {pending && <div className="plans-sheet-backdrop" onClick={() => { if (!busy) setPending(null); }}>
@@ -125,6 +125,7 @@ export function PlansScreen() {
           <div><dt>결제</dt><dd>정식 출시 후 진행 · 지금은 결제되지 않아요</dd></div>
         </dl>
         <p>카드 · 계좌 · 연락처 등 개인정보는 받지 않아요. 신청 내용은 언제든 취소할 수 있어요.</p>
+        {error && <p className="extra-error" role="alert">{error}</p>}
         <button ref={confirmRef} className="flow-button" type="button" disabled={busy} onClick={() => void confirm()}>{busy ? '신청 중…' : pending === 'dorm' ? '관심 등록하기' : '사전 구독 신청하기'}</button>
         <button className="flow-button flow-button--secondary" type="button" disabled={busy} onClick={() => setPending(null)}>닫기</button>
       </div>

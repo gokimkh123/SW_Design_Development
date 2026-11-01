@@ -556,3 +556,10 @@ ENGINE_IMPL=fake .venv/bin/python -m pytest tests -q
 
 - 결제 미연동: 카드 · 계좌 · 연락처를 받지 않고 `subscription_intents`(user_id, plan, 시각)만 저장. 신규 테이블은 기존 DB에 자동 생성
 - 정의되지 않은 플랜 · 추가 필드는 422, 사용자 ID 없음 · 미등록은 401 (`app/subscription_api.py`, `tests/test_subscriptions_api.py`)
+
+## 점검 반영 (11/1 밤)
+
+- 동시 실행 한도를 실행 기록 전에 확인: 사용자당 진행 중 3개(`MAX_RUNNING_PER_USER`) · 서버 전체 30개(`MAX_ACTIVE_SIMULATIONS`). 초과 시 429 `LLM_RATE_LIMITED`, 실패 행을 남기지 않음. 같은 후보 재요청(재사용)은 한도와 무관
+- SQLite WAL 모드(`initialize_database`에서 스키마 확인 통과 후 전환, 충돌 시 기존 파일 그대로 보존) · `synchronous=NORMAL`: SSE 읽기가 이벤트 쓰기를 막지 않음
+- uvicorn `--limit-concurrency 300`: 과도한 동시 연결은 503으로 거절
+- 남은 과제(발표 후): 컨테이너 비루트 실행(기존 볼륨 소유권 변경 필요), nginx 요청 수 제한(Envoy 뒤 실제 IP 설정 필요)

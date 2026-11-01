@@ -23,7 +23,7 @@
 .flow-count { margin-top: -10px; color: #96a2ad; font-size: 11px; text-align: right; }
 
 .flow-start { align-items: stretch; text-align: center; }
-.flow-start .flow-hero-icon { display: grid; place-items: center; width: 94px; height: 94px; margin: 17px auto 0; border-radius: 30px; background: #d9f4ee; font-size: 46px; transform: rotate(-5deg); }
+.flow-start .flow-hero-icon { display: grid; place-items: center; width: 94px; height: 94px; margin: 17px auto 0; border-radius: 30px; background: #d9f4ee; color: #0b8578; font-size: 46px; transform: rotate(-5deg); }
 .flow-start h1 { margin: -5px 0 0; }
 .flow-start h1 em { color: #0c9b8e; font-style: normal; }
 .flow-start-hero > .flow-muted { max-width: 285px; margin: 0 auto; }

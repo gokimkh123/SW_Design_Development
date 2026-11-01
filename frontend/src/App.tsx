@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { ApiError, api, getUserId, setUserId } from './api';
 import type { Answers, Candidate, Match, Persona, Report, RuleSet, Scene, Simulation, SurveyQuestion, Utterance, Verdict } from './api/types';
 import { AppShell } from './components/Shell';
+import { Icon } from './components/Icon';
 import type { AppTab } from './components/Shell';
 import { areAnswersComplete, isAnswerComplete } from './lib/survey';
 import { isCurrentSimulation, mergeSimulation } from './features/flowState';
@@ -157,7 +158,11 @@ function App() {
     const snapshot = simulationSnapshot.current;
     setReplayInstant(Boolean(snapshot && snapshot.simulation_id === saved.simulationId && snapshot.status === 'completed'));
   }, [step, saved.simulationId]);
-  const playback = useChatPlayback(scenes, { instant: replayInstant, resetKey: `${saved.simulationId ?? ''}:${step === 'simulation'}` });
+  const playback = useChatPlayback(scenes, { instant: replayInstant || step !== 'simulation', resetKey: `${saved.simulationId ?? ''}:${step === 'simulation'}` });
+  // 새로고침 등으로 늦게 받은 실행이 이미 끝났다면(아직 아무것도 표시 전) 천천히 재생하지 않고 바로 전부 표시
+  useEffect(() => {
+    if (step === 'simulation' && simulation?.simulation_id === saved.simulationId && simulation?.status === 'completed' && playback.shownCount === 0) setReplayInstant(true);
+  }, [step, simulation?.simulation_id, simulation?.status, saved.simulationId, playback.shownCount]);
   // 새 발화를 따라 내려가되, 사용자가 위로 올려 읽는 중이면 끌어내리지 않음
   const stickToBottom = useRef(true);
   const autoScrollUntil = useRef(0);
@@ -188,17 +193,21 @@ function App() {
     sceneEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
   function jumpToDay(day: number) {
+    stickToBottom.current = false;
+    setFollowing(false);
+    autoScrollUntil.current = 0;
     document.getElementById(`sim-day-${day}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   const candidatesFetchedAt = useRef(0);
+  const [candidatesLoaded, setCandidatesLoaded] = useState(false);
   const candidatesRef = useRef<Candidate[]>([]);
   useEffect(() => { candidatesRef.current = candidates; }, [candidates]);
   const refreshCandidates = useCallback(async (personaId: string) => {
     const request = ++candidateRequest.current;
     candidatesFetchedAt.current = Date.now();
     const response = await api.getCandidates(personaId);
-    if (activePersonaId.current === personaId && request === candidateRequest.current) setCandidates(response.candidates);
+    if (activePersonaId.current === personaId && request === candidateRequest.current) { setCandidates(response.candidates); setCandidatesLoaded(true); }
   }, []);
 
   useEffect(() => {
@@ -305,12 +314,14 @@ function App() {
 
   async function selectCandidate(candidate: Candidate) {
     if (!persona || busy) return;
+    const from = activeStep.current;
     setBusy(true); setError('');
     const hasActiveSimulation = !!candidate.simulation && candidate.simulation.status !== 'failed';
     try {
       const result = hasActiveSimulation
         ? await api.getSimulation(candidate.simulation!.simulation_id)
         : await api.startSimulation(persona.persona_id, candidate.candidate_id);
+      if (activeStep.current !== from) return;
       simulationSnapshot.current = result;
       setSimulation(result); setReport(null); setScenes([]); seenEvents.current.clear(); setDegraded(false); setReplayTargetId(null);
       update({ candidateId: candidate.candidate_id, candidateAlias: candidate.alias, simulationId: result.simulation_id, step: result.status === 'completed' ? 'report' : 'simulation' });
@@ -442,10 +453,17 @@ function App() {
   async function openReport() {
     if (!saved.simulationId || busy) return;
     const id = saved.simulationId;
+    const from = activeStep.current;
     setBusy(true); setError('');
     try {
       const result = await api.getReport(id);
-      if (!isCurrentSimulation(activeSimulationId.current, id)) return;
+      if (!isCurrentSimulation(activeSimulationId.current, id) || activeStep.current !== from) return;
+      if (simulationSnapshot.current?.simulation_id !== id) {
+        const fetched = await api.getSimulation(id);
+        if (!isCurrentSimulation(activeSimulationId.current, id) || activeStep.current !== from) return;
+        simulationSnapshot.current = fetched;
+        setSimulation(fetched);
+      }
       setReport(result); setSimulation(current => completedWithReport(current, result)); update({ step: 'report' });
     } catch (cause) { if (isCurrentSimulation(activeSimulationId.current, id)) setError(errorText(cause)); }
     finally { setBusy(false); }
@@ -454,12 +472,23 @@ function App() {
   async function requestMatch() {
     const id = saved.simulationId;
     if (!id || !simulation || simulation.simulation_id !== id || simulation.status !== 'completed' || report?.simulation_id !== id || busy) return;
+    const from = activeStep.current;
     setBusy(true); setError('');
     try {
       const result = await api.createMatch(id);
       if (!isCurrentSimulation(activeSimulationId.current, id) || result.simulation_id !== id) return;
-      setMatch(result); update({ step: 'match', matchId: result.match_id });
+      setMatch(result);
+      if (activeStep.current !== from) return;
+      update({ step: 'match', matchId: result.match_id });
     } catch (cause) { if (isCurrentSimulation(activeSimulationId.current, id)) setError(errorText(cause)); }
+    finally { setBusy(false); }
+  }
+
+  async function refreshMatchStatus() {
+    if (!match || busy) return;
+    setBusy(true); setError('');
+    try { setMatch(await api.getMatch(match.match_id)); }
+    catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   }
 
@@ -488,7 +517,7 @@ function App() {
     try {
       const response = await api.getCandidates(personaId);
       if (!isCurrent()) return;
-      setCandidates(response.candidates);
+      setCandidates(response.candidates); setCandidatesLoaded(true);
       const candidate = response.candidates.find(item => item.candidate_id === candidateId);
       if (!candidate) throw new Error('선택한 후보를 찾을 수 없어요.');
       if (!candidate.simulation || candidate.simulation.status !== 'completed') {
@@ -539,7 +568,7 @@ function App() {
   return <AppShell className={`step-${step}`} title={title[step]} visibleTabs={visibleTabs} showBack={['survey', 'simulation', 'report', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more'].includes(step)} onBack={back} activeTab={activeTab} enabledTabs={enabledTabs} onTabChange={changeTab}>
     {step === 'start' && <div className="flow-screen flow-start">
       <div className="flow-start-hero">
-      <div className="flow-hero-icon" aria-hidden="true">🛏️</div><p className="flow-kicker">우리 방의 시작</p><h1>나와 잘 맞는 룸메이트,<br /><em>미리 만나볼까요?</em></h1><p className="flow-muted">생활 습관을 알아보고 AI 시뮬레이션으로 함께 지낼 모습을 살펴봐요.</p>
+      <div className="flow-hero-icon" aria-hidden="true"><Icon name="bed" size={46} strokeWidth={1.8} /></div><p className="flow-kicker">우리 방의 시작</p><h1>나와 잘 맞는 룸메이트,<br /><em>미리 만나볼까요?</em></h1><p className="flow-muted">생활 습관을 알아보고 AI 시뮬레이션으로 함께 지낼 모습을 살펴봐요.</p>
       <div className="flow-card flow-info-list"><div><span>01</span><strong>생활 설문 12문항</strong><small>평소 습관과 상황별 선택</small></div><div><span>02</span><strong>후보 3명과 가상 생활</strong><small>20개 장면의 대화와 합의</small></div><div><span>03</span><strong>우리만의 생활 규칙</strong><small>매칭 후 함께 동의</small></div></div>
       </div>
       <div className="flow-start-form">
@@ -576,7 +605,7 @@ function App() {
       {loading && !candidates.length && <Notice>후보를 불러오는 중이에요…</Notice>}
       {visibleCandidates.length > 0 && <div className="flow-candidate-list">{visibleCandidates.map((candidate, index) => <CandidateCard key={candidate.candidate_id} candidate={candidate} index={index} best={index === bestCandidateIndex} busy={busy} onSelect={() => void selectCandidate(candidate)} />)}</div>}
       <p className="flow-candidates-note">1차 궁합은 설문으로 계산한 예상 점수예요. 가상 동거를 마치면 실제 대화 결과로 다시 계산돼요.</p>
-      {!loading && candidates.length === 0 && <Notice tone="error">표시할 후보가 없어요. 잠시 후 다시 시도해 주세요.</Notice>}
+      {!loading && candidatesLoaded && candidates.length === 0 && <Notice tone="error">표시할 후보가 없어요. 잠시 후 다시 시도해 주세요.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
       {replayTargetId && <Notice tone="warm">요청 한도 또는 서버 장애가 발생했어요. 잠시 후 다시 시도하거나 서버 리플레이를 요청할 수 있어요. 리플레이 데이터가 없으면 서버가 실시간 모드로 처리할 수 있습니다.</Notice>}
       {replayTargetId && <Button secondary disabled={busy} onClick={() => void retrySimulation('live')}>시뮬레이션 다시 시도</Button>}
@@ -611,7 +640,7 @@ function App() {
       {match?.status === 'accepted' && match.partner && <><div className="flow-card flow-partner"><span className="flow-avatar flow-avatar--1">{match.partner.name.slice(0, 1)}</span><div><h2>{match.partner.name} 님</h2><p>{match.partner.department} · {match.partner.year}학년</p><small>{match.partner.type_name}</small></div></div><div className="flow-card flow-greeting"><small>룸메이트의 첫 인사</small><p>“{match.partner.greeting}”</p></div><Notice>호실: {match.room ?? '확인 중'} · 생활 규칙 초안을 함께 확인해 주세요.</Notice></>}
       {match?.status === 'declined' && <Notice tone="error">매칭이 성사되지 않았어요. 다른 후보를 살펴보세요.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
-      {match?.status === 'accepted' ? <Footer><Button disabled={busy} onClick={() => void openRules()}>우리 방 생활 규칙 보기</Button></Footer> : <Footer><Button secondary disabled={busy} onClick={() => match && void api.getMatch(match.match_id).then(setMatch).catch(cause => setError(errorText(cause)))}>상태 다시 확인</Button></Footer>}
+      {match?.status === 'accepted' ? <Footer><Button disabled={busy} onClick={() => void openRules()}>우리 방 생활 규칙 보기</Button></Footer> : <Footer><Button secondary disabled={busy} onClick={() => void refreshMatchStatus()}>상태 다시 확인</Button></Footer>}
     </div>}
 
     {step === 'rules' && <div className="flow-screen"><p className="flow-lead">{match?.room ?? '우리 방'} 생활 규칙</p><p className="flow-muted">7일간의 대화에서 나온 약속을 정리했어요.</p>{loading && !rules && <Notice>생활 규칙을 불러오는 중이에요…</Notice>}

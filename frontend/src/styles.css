@@ -68,7 +68,7 @@ button:disabled { cursor: not-allowed; }
 }
 .bottom-nav-item.is-active { color: #1d2732; }
 .bottom-nav-item:disabled { opacity: 1; }
-.bottom-nav-icon { font-size: 21px; line-height: 1; }
+.bottom-nav-icon { display: grid; place-items: center; height: 24px; font-size: 21px; line-height: 1; }
 
 .card { border-radius: 20px; padding: 18px; background: #fff; box-shadow: 0 1px 3px rgb(21 47 60 / 3%); }
 .primary-button {
