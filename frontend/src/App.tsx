@@ -538,12 +538,16 @@ function App() {
   const visibleTabs: AppTab[] | undefined = isMock ? undefined : ['match', 'persona', 'plans'];
   return <AppShell className={`step-${step}`} title={title[step]} visibleTabs={visibleTabs} showBack={['survey', 'simulation', 'report', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more'].includes(step)} onBack={back} activeTab={activeTab} enabledTabs={enabledTabs} onTabChange={changeTab}>
     {step === 'start' && <div className="flow-screen flow-start">
+      <div className="flow-start-hero">
       <div className="flow-hero-icon" aria-hidden="true">🛏️</div><p className="flow-kicker">우리 방의 시작</p><h1>나와 잘 맞는 룸메이트,<br /><em>미리 만나볼까요?</em></h1><p className="flow-muted">생활 습관을 알아보고 AI 시뮬레이션으로 함께 지낼 모습을 살펴봐요.</p>
       <div className="flow-card flow-info-list"><div><span>01</span><strong>생활 설문 12문항</strong><small>평소 습관과 상황별 선택</small></div><div><span>02</span><strong>후보 3명과 가상 생활</strong><small>20개 장면의 대화와 합의</small></div><div><span>03</span><strong>우리만의 생활 규칙</strong><small>매칭 후 함께 동의</small></div></div>
+      </div>
+      <div className="flow-start-form">
       <Notice>매칭 전에는 실명과 사진이 공개되지 않아요. 닉네임만으로 바로 시작할 수 있어요.</Notice>
       <label className="flow-input-label" htmlFor="nickname">어떻게 불러드릴까요?</label><input id="nickname" className="flow-input" maxLength={10} placeholder="닉네임을 입력해 주세요" value={saved.nickname} onChange={event => update({ nickname: event.target.value })} onKeyDown={event => { if (event.key === 'Enter') void start(); }} /><small className="flow-count">{saved.nickname.trim().length}/10자</small>
       {error && <Notice tone="error">{error}</Notice>}
       <Footer><Button disabled={busy || saved.nickname.trim().length < 1} onClick={() => void start()}>{busy ? '시작하는 중…' : '나의 룸메이트 찾기'}</Button></Footer>
+      </div>
     </div>}
 
     {step === 'survey' && <div className="flow-screen">

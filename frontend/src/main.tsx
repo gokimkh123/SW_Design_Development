@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// Pretendard(OFL) 가변 글꼴 · 글자 범위별 분할 파일을 앱에 포함 (외부 CDN 없이 필요한 글자만 내려받음)
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './styles.css';
 // 반응형 규칙은 모든 화면 CSS 뒤에 적용 (PC 레이아웃이 기본 규칙을 덮도록)
 import './features/responsive.css';
