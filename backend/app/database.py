@@ -99,6 +99,9 @@ def initialize_database(db_path: Path) -> None:
     # 충돌 시에는 기존 파일을 그대로 보존한다. 설정은 DB 파일에 유지되며 이미 WAL이면 변화 없음
     wal = sqlite3.connect(db_path, timeout=10)
     try:
-        wal.execute('PRAGMA journal_mode = WAL')
+        if wal.execute('PRAGMA journal_mode').fetchone()[0].lower() != 'wal':
+            wal.execute('PRAGMA journal_mode = WAL')
+    except sqlite3.OperationalError:
+        pass  # 다른 연결이 동시에 전환 중(잠김)이면 다음 호출에서 다시 시도. 성능 설정이라 동작에는 영향 없음
     finally:
         wal.close()
