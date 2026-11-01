@@ -5,10 +5,11 @@ import { provisionalSurvey } from './survey';
 import type {
   Answers, ApiClient, Axes, Candidate, Comparison, Match, Persona, RephraseResult,
   Report, Rule, RuleProposal, RuleSet, Scene, SceneResult, Simulation, SimulationEvent,
-  SimulationMode, Verdict,
+  SimulationMode, Subscription, Verdict,
 } from '../api/types';
 
 const now = () => new Date().toISOString();
+let subscription: Subscription = { plan: null, updated_at: null };
 const clone = <T,>(value: T): T => structuredClone(value);
 const uid = () => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
 const requireUser = () => {
@@ -272,6 +273,7 @@ export const mockApi: ApiClient = {
     for (const timer of timers.values()) clearTimeout(timer);
     timers.clear(); observers.clear(); sequences.clear(); cursors.clear();
     persona = null; simulations.clear(); matches.clear(); ruleSets.clear(); proposals.clear(); persist();
+    subscription = { plan: null, updated_at: null };
     return { user_id: `usr_${uid()}`, nickname: nickname.trim(), created_at: now() };
   },
   async getSurvey() { return clone(provisionalSurvey); },
@@ -443,6 +445,9 @@ export const mockApi: ApiClient = {
     persist();
     return clone(rule);
   },
+  async getSubscription() { requireUser(); return { ...subscription }; },
+  async saveSubscription(plan) { requireUser(); subscription = { plan, updated_at: now() }; return { ...subscription }; },
+  async cancelSubscription() { requireUser(); subscription = { plan: null, updated_at: null }; return { ...subscription }; },
   async rephraseMemo(matchId, memo): Promise<RephraseResult> {
     requireUser();
     if (!matches.has(matchId)) throw new ApiError(404, 'MATCH_NOT_FOUND', '매칭을 찾을 수 없어요.');

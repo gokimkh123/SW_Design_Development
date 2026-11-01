@@ -1,0 +1,29 @@
+/* 멤버십(구독) 화면 — 결제 미연동, 사전 신청만 기록 */
+.plans-card { position: relative; display: grid; gap: 14px; }
+.plans-card.is-featured { box-shadow: 0 0 0 2px #0b8578, 0 8px 22px rgb(11 133 120 / 12%); }
+.plans-badge { position: absolute; top: -10px; right: 18px; border-radius: 999px; padding: 4px 10px; background: #0b8578; color: white; font-size: 11.5px; font-weight: 800; }
+.plans-badge.is-org { background: #5b4be0; }
+.plans-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.plans-head h2 { margin: 0; font-weight: 800; }
+.plans-price { color: #13202a; font-size: 22px; font-weight: 850; letter-spacing: -.03em; white-space: nowrap; }
+.plans-price small { color: #6b7680; font-size: 12px; font-weight: 700; letter-spacing: 0; }
+.plans-cycle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; border-radius: 12px; padding: 4px; background: #eef2f3; }
+.plans-cycle button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: #5f6b77; font-size: 14px; font-weight: 800; }
+.plans-cycle button.is-active { background: white; color: #0b8578; box-shadow: 0 1px 3px rgb(21 47 60 / 12%); }
+.plans-note { margin: -4px 0 0; color: #0b8578; font-size: 12.5px; font-weight: 700; }
+.plans-features { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.plans-features li { display: grid; grid-template-columns: 14px 1fr; gap: 8px; color: #33424e; font-size: 13.5px; line-height: 1.5; }
+.plans-features li > span { color: #0b8578; font-weight: 900; }
+.plans-features em { display: inline-block; margin-left: 6px; border-radius: 6px; padding: 1px 6px; background: #f1eefe; color: #5b4be0; font-size: 11.5px; font-style: normal; font-weight: 800; }
+.plans-done { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 13px; padding: 14px 16px; background: #e3f7f3; color: #0b7569; font-size: 14px; }
+.plans-done .extra-inline-link { padding: 0; color: #5f6b77; }
+.plans-sheet-backdrop { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgb(17 26 33 / 45%); }
+.plans-sheet { display: grid; gap: 12px; width: 100%; max-width: 430px; border-radius: 22px 22px 0 0; padding: 24px 20px calc(20px + env(safe-area-inset-bottom)); background: white; }
+.plans-sheet h2 { margin: 0; font-size: 18px; font-weight: 800; }
+.plans-sheet dl { display: grid; gap: 10px; margin: 0; border-radius: 14px; padding: 14px 16px; background: #f5f7f8; }
+.plans-sheet dl div { display: grid; grid-template-columns: 52px 1fr; gap: 10px; font-size: 14px; }
+.plans-sheet dt { color: #6b7680; font-weight: 700; }
+.plans-sheet dd { margin: 0; color: #13202a; font-weight: 700; }
+.plans-sheet p { margin: 0; color: #5f6b77; font-size: 12.5px; line-height: 1.6; }
+.plans-cta { justify-self: start; }
+.plans-grid { display: grid; gap: 18px; }

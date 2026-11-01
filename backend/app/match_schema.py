@@ -39,4 +39,11 @@ SCHEMAS = {
         status TEXT NOT NULL CHECK (status IN ('proposed', 'accepted')),
         created_at TEXT NOT NULL
     )''',
+    # 멤버십 사전 구독 신청 (API.md 4.17). 결제 정보 · 연락처 없이 사용자별 선택 플랜만 저장. 기존 DB에 자동 생성
+    'subscription_intents': '''CREATE TABLE subscription_intents (
+        user_id TEXT NOT NULL PRIMARY KEY REFERENCES users(user_id),
+        plan TEXT NOT NULL CHECK (plan IN ('plus_monthly', 'plus_semester', 'dorm')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )''',
 }
