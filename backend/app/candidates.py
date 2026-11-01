@@ -3,7 +3,7 @@
 # 결과: 익명 후보 카드 또는 필수 데이터 오류를 반환한다.
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +24,18 @@ class SeedCandidate(BaseModel):
     is_seed: bool
 
 
+class CandidateProgress(BaseModel):
+    done: int = Field(ge=0)
+    total: int = Field(ge=1)
+
+
+class CandidateSimulation(BaseModel):
+    simulation_id: str
+    status: Literal['queued', 'running', 'completed', 'failed']
+    progress: CandidateProgress
+    score: int | None
+
+
 class CandidateResponse(BaseModel):
     model_config = ConfigDict(strict=True, extra='forbid')
     candidate_id: Nonempty
@@ -33,7 +45,7 @@ class CandidateResponse(BaseModel):
     type_name: Nonempty
     pre_score: int = Field(ge=0, le=100)
     highlight: str
-    simulation: None = None
+    simulation: CandidateSimulation | None = None
 
 
 class CandidatesResponse(BaseModel):
@@ -66,13 +78,16 @@ def select_candidates(me: dict, seed_path: Path) -> CandidatesResponse:
         raise ValueError('시드 personas는 목록이어야 합니다.')
     cards = []
     seen = set()
+    nickname = me.get('nickname') or ''
     for raw in seeds:
         seed = SeedCandidate.model_validate(raw)
         if seed.persona_id in seen or not seed.is_seed:
             raise ValueError('시드 ID 중복 또는 시드 표시 오류입니다.')
         seen.add(seed.persona_id)
+        # 닉네임에 후보 실명이 들어 있으면 익명 치환이 사용자 이름까지 바꾸므로(다은이 → 후보 A이) 후보에서 제외
         if (not seed.candidate_pool or seed.persona_id == me['persona_id']
-                or seed.user_id == me['user_id']):
+                or seed.user_id == me['user_id']
+                or any(name and name in nickname for name in (raw.get('name'), raw.get('nickname')))):
             continue
         score = pre_score(me['axes'], raw['axes'])
         closest = min(WEIGHTS, key=lambda axis: abs(me['axes'][axis] - raw['axes'][axis]))

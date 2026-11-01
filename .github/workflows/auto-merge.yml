@@ -32,7 +32,7 @@ jobs:
       - name: 보호 경로 변경 확인
         run: |
           files=$(gh api "repos/$REPO/compare/develop...$SHA" --jq '.files[].filename')
-          PROTECTED='^(\.github/|\.githooks/|scripts/|deploy/|docs/common/|\.gitignore$|\.gitattributes$|\.dockerignore$|(.*/)?Dockerfile$)'
+          PROTECTED='^(\.github/|\.githooks/|scripts/|deploy/|docs/common/|\.gitignore$|\.gitattributes$|(.*/)?\.dockerignore$|(.*/)?Dockerfile$|frontend/nginx\.conf$|backend/requirements[^/]*\.txt$)'
           blocked=$(printf '%s\n' "$files" | grep -E "$PROTECTED" || true)
           if [ -n "$blocked" ]; then
             echo "::error::보호 경로 변경 포함 → 자동 병합 중단. $BRANCH → develop PR 생성 후 건한 승인 필요"

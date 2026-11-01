@@ -102,8 +102,13 @@ def test_simulate_event_shapes_match_api_section5():
     assert len(judged) == 20
     assert judged[-1]["progress"] == {"done": 20, "total": 20}
 
-    first_scene = events[:4]
-    assert [e["type"] for e in first_scene] == ["scene_started", "utterance", "utterance", "scene_judged"]
+    first_scene = events[:6]
+    assert [e["type"] for e in first_scene] == ["scene_started"] + ["utterance"] * 4 + ["scene_judged"]
+    assert [e["data"]["turn"] for e in first_scene[1:5]] == [1, 2, 3, 4]
+    # 장면별 시나리오: 치환자가 남지 않고, 장면마다 대사가 다름
+    texts = [e["data"]["text"] for e in events if e["type"] == "utterance"]
+    assert len(texts) == 80 and not any("{" in text for text in texts)
+    assert len(set(texts)) == 80
     assert set(first_scene[0]["data"]) == {"scene_index", "scene"}
     assert set(first_scene[0]["data"]["scene"]) == {"scene_id", "day", "weekday", "time", "category", "title", "situation"}
     assert set(first_scene[1]["data"]) == {"scene_index", "turn", "speaker", "name", "text"}
@@ -128,3 +133,17 @@ def test_draft_rules_one_per_area_with_most_severe_source():
     assert all(set(r["source"]) == {"scene_index", "day", "verdict"} for r in rules)
     fridge = next(r for r in rules if r["area"] == "fridge")
     assert fridge["source"] == {"scene_index": 14, "day": 5, "verdict": "conflict"}
+
+
+def test_situation_particles_follow_final_consonant():
+    assert fake_engine._situation("{A}는 자려고 누웠는데 {B}의 조명", "하늘", "후보 A") == "하늘은 자려고 누웠는데 후보 A의 조명"
+    assert fake_engine._situation("{A}와 {B}가 원하는 온도", "다은", "지우") == "다은과 지우가 원하는 온도"
+    assert fake_engine._situation("{B}가 {A}의 드라이기를", "민수", "후보 B") == "후보 B가 민수의 드라이기를"
+
+
+def test_spoken_time_and_delay(monkeypatch):
+    assert [fake_engine._spoken_time(t) for t in ("23:30", "07:00", "00:15", None)] == ["11시 반", "7시", "12시 15분", "그 시간"]
+    monkeypatch.setenv("REPLAY_DELAY_MS", "600")
+    assert fake_engine._delay_seconds() == 0.6
+    monkeypatch.setenv("REPLAY_DELAY_MS", "abc")
+    assert fake_engine._delay_seconds() == 0.0

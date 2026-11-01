@@ -38,7 +38,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown, publicRo
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, 'NETWORK_ERROR', '백엔드에 연결할 수 없어요. 서버 실행 상태를 확인해 주세요.');
+    throw new ApiError(0, 'NETWORK_ERROR', '네트워크 연결이 불안정해요. 잠시 후 다시 시도해 주세요.');
   }
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => null);
@@ -90,7 +90,9 @@ function subscribeSimulation(
   const seenIds = new Set<string>();
 
   const connect = async () => {
-    for (let attempt = 0; attempt < 3 && !stopped && !completed; attempt++) {
+    // 연속 실패 5회까지 재연결(이벤트를 받으면 0으로 초기화), 대기 0.7 → 1.4 → 2.8 → 5초
+    let failures = 0;
+    while (!stopped && !completed) {
       let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
       let failure: Error | null = null;
       try {
@@ -116,20 +118,13 @@ function subscribeSimulation(
           while (boundary >= 0) {
             const event = parseSseBlock(buffer.slice(0, boundary));
             buffer = buffer.slice(boundary + 2);
-            if (event?.type === 'error') {
-              if (!seenIds.has(event.id)) {
-                seenIds.add(event.id);
-                onEvent(event);
-              }
-              // Do not advance Last-Event-ID past an error event; each retry
-              // must still fail fast if the server repeats the same error.
-              throw new Error(event.data.message);
-            }
             if (event && !seenIds.has(event.id)) {
               seenIds.add(event.id);
               lastEventId = event.id;
+              failures = 0;
               onEvent(event);
-              if (event.type === 'simulation_completed') { completed = true; controller.abort(); break; }
+              // 완료 · 오류 이벤트는 실행 종료: 서버가 스트림을 닫으므로 재연결하지 않음
+              if (event.type === 'simulation_completed' || event.type === 'error') { completed = true; controller.abort(); break; }
             }
             boundary = buffer.indexOf('\n\n');
           }
@@ -146,8 +141,9 @@ function subscribeSimulation(
           reader.releaseLock();
         }
       }
-      if (failure && attempt === 2) { onError(failure); return; }
-      if (!stopped && !completed) await new Promise<void>((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+      failures += 1;
+      if (failure && failures >= 5) { onError(failure); return; }
+      if (!stopped && !completed) await new Promise<void>((resolve) => setTimeout(resolve, Math.min(5000, 700 * 2 ** (failures - 1))));
     }
   };
   void connect();

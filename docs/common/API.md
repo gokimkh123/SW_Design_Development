@@ -240,7 +240,7 @@ sequenceDiagram
 
 - `scene_verdicts`: 장면 순서 20개, 진행 막대 색상 표시용
 - `highlights`: 충돌 → 조율 순, 동일 판정은 장면 순
-- `expected_conflicts_per_month`: P1, 산식 확정 전까지 `null`
+- `expected_conflicts_per_month`: 월 예상 갈등 추정치(소수 첫째 자리), 산식은 [PRD 부록 C](PRD.md#부록-c-계산-규칙-초안). 판정 장면이 없으면 `null`
 
 ### Match
 
@@ -298,8 +298,10 @@ sequenceDiagram
 
 ```jsonc
 // 200
-{ "status": "ok", "llm": { "provider": "anthropic", "model": "claude-haiku-5-5" }, "sim_mode": "agents" }
+{ "status": "ok", "llm": { "provider": "anthropic", "model": "claude-haiku-5-5" }, "sim_mode": "agents", "engine": "fake" }
 ```
+
+- `engine`: 실행 중인 엔진 구현 (`fake` 시나리오 엔진 · `real` LLM 엔진)
 
 ### 4.2 POST /api/users
 
@@ -479,7 +481,7 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 
 ### 4.16 P1 엔드포인트
 
-**GET /api/simulations/{simulation_id}/scenes** — `200` `{ "scenes": [SceneResult × 20] }`
+**GET /api/simulations/{simulation_id}/scenes** — `200` `{ "scenes": [SceneResult × 20] }` (완료 전 `409 SIMULATION_NOT_COMPLETED`)
 
 **GET /api/personas/{persona_id}/comparison**
 
@@ -499,6 +501,8 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
   "recommended_candidate_id": "per_daeun"
 }
 ```
+
+- 후보 비교: `score`는 완료된 시뮬레이션 점수, 미실행 후보는 1차 점수(`pre_score`). `expected_conflicts_per_month`는 완료 후보만 값 제공. `recommended_candidate_id`는 시뮬레이션 완료 후보 우선, 그다음 점수 순
 
 **POST /api/rules/{rule_id}/proposals**
 
@@ -693,7 +697,7 @@ export default defineConfig({
 | `LLM_MAX_CONCURRENCY` | `8` | 동시 LLM 요청 수 상한 |
 | `ENGINE_IMPL` | `fake` | `fake` 백엔드 임시 가짜 엔진(LLM 미호출, 기본값) · `real` `engine` 패키지 |
 | `SIM_MODE` | `agents` | `live` 실행 방식: `agents` · `single` (`replay`는 요청 `mode`로 지정) |
-| `REPLAY_DELAY_MS` | `600` | 리플레이 발화 간격 |
+| `REPLAY_DELAY_MS` | `600` | 리플레이 · 가짜 엔진 발화 간격 (가짜 엔진 기본 0, 배포 compose 기본 600) |
 | `DATABASE_URL` | `sqlite:///./roommate.db` | |
 
 예시 파일: [`backend/.env.example`](../../backend/.env.example)

@@ -66,7 +66,7 @@ def test_report_contract_snapshot_privacy_and_read_only(context, monkeypatch):
     assert [h['scene_index'] for h in data['highlights']] == [3, 7, 11, 15, 19, 2, 6, 10, 14, 18]
     assert data['highlights'][0]['agreement'] is None
     assert data['highlights'][1]['agreement'] == '후보 A 합의'
-    assert data['expected_conflicts_per_month'] is None
+    assert data['expected_conflicts_per_month'] == 4.0  # 월 8회 × (충돌 5 + 0.5 × 조율 5) / 판정 15
     for highlight in data['highlights']:
         scene = args['scenes'][highlight['scene_index'] - 1]
         assert highlight['title'] == scene['title'] and highlight['day'] == scene['day']

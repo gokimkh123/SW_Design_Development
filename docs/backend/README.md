@@ -505,7 +505,7 @@ curl -H 'X-User-Id: usr_발급받은ID' \
 - `score`와 `headline`: 기존 실행기가 엔진의 score/headline을 호출하고 `complete_simulation`으로 저장한 최종 값을 그대로 사용한다. 후보 추림의 `pre_score`와 다르며 조회 시 재계산하지 않는다.
 - `scene_verdicts`: 저장된 장면 순서 20개. `verdict_counts`는 harmonious/negotiated/conflict/pending 네 항목이며 장면 집계와 저장된 완료 집계의 일치를 검사한다. pending은 유효한 판정 보류이며 누락된 판정을 pending으로 대체하지 않는다.
 - `highlights`: 모든 conflict 장면 다음에 negotiated 장면을 배치하며, 같은 판정은 scene_index 오름차순이다. 장면 번호·일차·제목과 저장된 agreement만 반환한다. 합의안이 null이면 그대로 유지한다.
-- `expected_conflicts_per_month`: 산식 미확정으로 항상 null이다.
+- `expected_conflicts_per_month`: PRD 부록 C 산식(월 8회 × 충돌 비율, 조율 0.5회)의 추정치. 판정 장면이 없으면 null이다.
 - 원본 입력, 후보 실명·사용자 ID, 내부 모드, 대화·판정 근거, 실패 상세, 선택적 result.report는 공개하지 않는다. 자유 문구의 알려진 후보 이름은 실행 당시 별칭으로 치환한다.
 
 | HTTP | 오류 코드 | 조건 |
@@ -525,3 +525,21 @@ ENGINE_IMPL=fake .venv/bin/python -m pytest tests -q
 ```
 
 전용 테스트는 정상 응답·사용자/소유권·모든 상태·손상 결과·점수·집계·순서·null 합의안·개인정보 비노출·반복 조회의 DB 바이트 무변경을 검사한다. 사용자 생성 → 페르소나 생성 → 후보 조회 → 시뮬레이션 시작 → 20장면 완료 → 리포트 조회 통합 흐름도 가짜 엔진으로 검증한다. 실제 사용자 DB와 유료 LLM은 사용하지 않는다. 실제 엔진 통합, replay 재생, 후보 카드의 simulation 연결, 매칭·생활 규칙·프론트엔드는 이번 변경 범위에서 제외한다.
+
+## P1 API · 발표회 보완 (11/1)
+
+| 경로 | 내용 |
+| --- | --- |
+| `GET /api/simulations/{id}/scenes` | 완료된 실행의 장면 20개(대화 · 판정). 완료 전 409 |
+| `GET /api/personas/{id}/comparison` | 나와 후보 3명의 5개 축, 점수(완료 시 시뮬레이션 점수, 아니면 1차 점수), 월 예상 갈등, 추천 후보(완료 후보 우선) |
+| `POST /api/rules/{rule_id}/proposals` | 규칙 수정 제안 → 엔진 `mediate` 중재안. `rule_proposals` 테이블 저장(신규 테이블, 기존 DB 자동 생성) |
+| `POST /api/proposals/{id}/accept` | 중재안을 규칙 문구로 반영. 반복 호출 결과 동일 |
+| `POST /api/mediation/rephrase` | 불편 메모 → 엔진 `rephrase` 요청형 문장 · 규칙 제안. 메모 원문 미저장 · 미기록 |
+
+- 소유자 확인: 모든 경로에서 `X-User-Id` 소유 자원만 접근, 타인 자원은 404
+- 후보 카드 `simulation`: 후보별 최근 실행 상태(`latest_by_candidate`) 반환
+- 닉네임에 후보 실명이 포함된 경우(예: 다은이) 해당 후보 제외: 익명 치환이 사용자 이름까지 바꾸는 문제 방지
+- 동시 실행 상한 30건: 초과 시 429 `LLM_RATE_LIMITED`, 해당 실행은 실패로 기록되어 다시 시작 가능
+- 가짜 엔진: 장면별 대화 시나리오(`app/fake_scripts.py`, 장면 20개 × 판정 3종 × 발화 4개), `REPLAY_DELAY_MS` 간격으로 발화 전송(기본 0, 배포 600ms)
+- SSE 조회 간격 0.2초, 의존성 버전 고정(`requirements.txt`)
+
