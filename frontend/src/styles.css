@@ -11,6 +11,8 @@
 
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
+/* 한국어는 어절 단위로 줄바꿈 (예: "지낼"이 "지 / 낼"로 갈라지지 않게), 긴 문자열만 예외적으로 끊음 */
+body { word-break: keep-all; overflow-wrap: break-word; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }

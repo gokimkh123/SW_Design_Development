@@ -19,7 +19,8 @@ function points(axes: Comparison['me']['axes'], scale = 1): string {
   }).join(' ');
 }
 
-const radarColors = ['#dc8050', '#6475d0', '#b35a91'];
+// 후보 아바타 색(.flow-avatar 기본 · --1 · --2)과 같은 계열: 후보 A 보라 · B 주황 · C 파랑
+const radarColors = ['#7954b9', '#e58b2f', '#3f93bd'];
 
 function Radar({ me, candidates, selectedId }: { me: Comparison['me']['axes']; candidates: Comparison['candidates']; selectedId: string }) {
   const empty = Object.fromEntries(axisKeys.map(key => [key, 100])) as Comparison['me']['axes'];
