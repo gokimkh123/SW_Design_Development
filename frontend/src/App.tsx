@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api, getUserId, setUserId } from './api';
 import type { Answers, Candidate, Match, Persona, Report, RuleSet, Scene, Simulation, SurveyQuestion, Utterance, Verdict } from './api/types';
 import { AppShell } from './components/Shell';
@@ -10,6 +10,7 @@ import { withSessionSimulation } from './lib/candidateOverlay';
 import { ComparisonScreen, MemoScreen, RuleProposalScreen, SceneReplayScreen } from './features/P1Screens';
 import { PlansScreen } from './features/PlansScreen';
 import { CandidateCard, displayedScore } from './features/CandidateCard';
+import { DayChips, TypingBubble, useChatPlayback } from './features/ChatPlayback';
 import { AdminScreen, AxisPreviewEditor, CheckinScreen, DemoMenuScreen, RoomScreen } from './features/P2Screens';
 import './features/flow.css';
 import './features/extras.css';
@@ -58,10 +59,6 @@ function timeOptions(min: string, max: string, step: number): string[] {
     result.push(`${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`);
   }
   return result;
-}
-
-function statusLabel(status: Simulation['status']): string {
-  return { queued: '대기 중', running: '시뮬레이션 중', completed: '완료', failed: '실패' }[status];
 }
 
 function supportsReplay(error: unknown): boolean {
@@ -153,17 +150,28 @@ function App() {
   }, [step, saved.questionIndex]);
   useEffect(() => { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(saved)); }, [saved]);
   useEffect(() => { setError(''); }, [step]);
-  // B2: 새 발화를 따라 내려가되, 사용자가 위로 올려 읽는 중이면 끌어내리지 않음
+  // B2: 받은 대화를 메신저처럼 천천히 표시. 이미 끝난 실행을 다시 열면 즉시 전부 표시
+  const [replayInstant, setReplayInstant] = useState(false);
+  useEffect(() => {
+    if (step !== 'simulation') return;
+    const snapshot = simulationSnapshot.current;
+    setReplayInstant(Boolean(snapshot && snapshot.simulation_id === saved.simulationId && snapshot.status === 'completed'));
+  }, [step, saved.simulationId]);
+  const playback = useChatPlayback(scenes, { instant: replayInstant, resetKey: `${saved.simulationId ?? ''}:${step === 'simulation'}` });
+  // 새 발화를 따라 내려가되, 사용자가 위로 올려 읽는 중이면 끌어내리지 않음
   const stickToBottom = useRef(true);
   const autoScrollUntil = useRef(0);
+  const [following, setFollowing] = useState(true);
   useEffect(() => {
     if (step !== 'simulation') return;
     const content = document.querySelector<HTMLElement>('.app-content');
     if (!content) return;
     stickToBottom.current = true;
+    setFollowing(true);
     const onScroll = () => {
       if (Date.now() < autoScrollUntil.current) return;
       stickToBottom.current = content.scrollHeight - content.scrollTop - content.clientHeight < 140;
+      setFollowing(stickToBottom.current);
     };
     content.addEventListener('scroll', onScroll, { passive: true });
     return () => content.removeEventListener('scroll', onScroll);
@@ -172,7 +180,16 @@ function App() {
     if (step !== 'simulation' || degraded || !stickToBottom.current) return;
     autoScrollUntil.current = Date.now() + 700;
     sceneEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [scenes, degraded, step]);
+  }, [playback.shownCount, playback.typing, degraded, step]);
+  function scrollToLatest() {
+    stickToBottom.current = true;
+    setFollowing(true);
+    autoScrollUntil.current = Date.now() + 700;
+    sceneEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+  function jumpToDay(day: number) {
+    document.getElementById(`sim-day-${day}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   const candidatesFetchedAt = useRef(0);
   const candidatesRef = useRef<Candidate[]>([]);
@@ -509,7 +526,11 @@ function App() {
   const activeCandidate = candidates.find(item => item.candidate_id === saved.candidateId);
   const bestCandidateIndex = visibleCandidates.reduce((best, item, index, list) => displayedScore(item) > displayedScore(list[best]) ? index : best, 0);
   const selectedRule = rules?.rules.find(item => item.rule_id === saved.ruleId);
-  const sceneVerdicts = Array.from({ length: 20 }, (_, index) => scenes.find(item => item.index === index + 1)?.verdict);
+  const visibleScenes = [...scenes].sort((a, b) => a.index - b.index).filter(item => playback.visible.has(item.index));
+  const shownVerdicts = Array.from({ length: 20 }, (_, index) => playback.visible.get(index + 1)?.verdict ? scenes.find(item => item.index === index + 1)?.verdict : undefined);
+  const shownDays = new Set(visibleScenes.map(item => item.scene?.day).filter((day): day is number => day != null));
+  const currentDay = visibleScenes[visibleScenes.length - 1]?.scene?.day ?? null;
+  const simStatusText = !simulation ? '연결 중' : simulation.status === 'failed' ? '중단됨' : simulation.status === 'completed' && playback.caughtUp ? '완료' : scenes.length === 0 ? '준비 중' : '대화 진행 중';
   const title: Record<Step, string> = { start: '룸메궁합', survey: question?.section === 'situation' ? '상황 질문' : '생활 설문', persona: '내 생활 페르소나', candidates: '후보 룸메이트', simulation: activeCandidate?.alias ?? saved.candidateAlias ?? '룸메이트 시뮬레이션', report: '궁합 리포트', match: '매칭 성사', rules: '생활 규칙', comparison: '후보 비교', sceneReplay: '대화 다시 보기', ruleProposal: '규칙 수정 제안', room: '우리 방', memo: '불편 전하기', checkin: '월간 체크인', admin: '관리자 시안', more: '전체', plans: '멤버십' };
   const activeTab: AppTab | undefined = ['room', 'memo', 'checkin'].includes(step) ? 'room' : ['more', 'admin'].includes(step) ? 'all' : step === 'persona' ? 'persona' : step === 'plans' ? 'plans' : ['candidates', 'simulation', 'report', 'comparison', 'sceneReplay', 'match', 'rules', 'ruleProposal'].includes(step) ? 'match' : undefined;
   const enabledTabs: AppTab[] = activeTab ? [...new Set<AppTab>([activeTab, ...(saved.personaId ? ['match', 'persona', 'plans'] as AppTab[] : []), ...(isMock ? ['room', 'all'] as AppTab[] : [])])] : [];
@@ -519,7 +540,7 @@ function App() {
     {step === 'start' && <div className="flow-screen flow-start">
       <div className="flow-hero-icon" aria-hidden="true">🛏️</div><p className="flow-kicker">우리 방의 시작</p><h1>나와 잘 맞는 룸메이트,<br /><em>미리 만나볼까요?</em></h1><p className="flow-muted">생활 습관을 알아보고 AI 시뮬레이션으로 함께 지낼 모습을 살펴봐요.</p>
       <div className="flow-card flow-info-list"><div><span>01</span><strong>생활 설문 12문항</strong><small>평소 습관과 상황별 선택</small></div><div><span>02</span><strong>후보 3명과 가상 생활</strong><small>20개 장면의 대화와 합의</small></div><div><span>03</span><strong>우리만의 생활 규칙</strong><small>매칭 후 함께 동의</small></div></div>
-      <Notice>이 화면은 발표회 체험용입니다. 학교 인증이나 실제 호실 배정은 진행하지 않아요.</Notice>
+      <Notice>매칭 전에는 실명과 사진이 공개되지 않아요. 닉네임만으로 바로 시작할 수 있어요.</Notice>
       <label className="flow-input-label" htmlFor="nickname">어떻게 불러드릴까요?</label><input id="nickname" className="flow-input" maxLength={10} placeholder="닉네임을 입력해 주세요" value={saved.nickname} onChange={event => update({ nickname: event.target.value })} onKeyDown={event => { if (event.key === 'Enter') void start(); }} /><small className="flow-count">{saved.nickname.trim().length}/10자</small>
       {error && <Notice tone="error">{error}</Notice>}
       <Footer><Button disabled={busy || saved.nickname.trim().length < 1} onClick={() => void start()}>{busy ? '시작하는 중…' : '나의 룸메이트 찾기'}</Button></Footer>
@@ -547,7 +568,7 @@ function App() {
     </div>}
 
     {step === 'candidates' && <div className="flow-screen flow-candidates"><div className="flow-candidates-intro"><p className="flow-lead">{visibleCandidates.length ? `나와 잘 맞을 것 같은 후보 ${visibleCandidates.length}명이에요` : '나와 잘 맞을 것 같은 후보를 찾고 있어요'}</p><p className="flow-muted">후보를 골라 7일 가상 동거를 해 보세요. 매칭 전에는 실명과 사진이 공개되지 않아요.</p>
-      <ol className="flow-steps" aria-label="진행 순서"><li><b>1</b>후보 고르기</li><li><b>2</b>7일 가상 동거<small>약 1분</small></li><li><b>3</b>궁합 리포트</li></ol></div>
+      <ol className="flow-steps" aria-label="진행 순서"><li><b>1</b>후보 고르기</li><li><b>2</b>7일 가상 동거<small>메신저 대화 약 2~3분</small></li><li><b>3</b>궁합 리포트</li></ol></div>
       {loading && !candidates.length && <Notice>후보를 불러오는 중이에요…</Notice>}
       {visibleCandidates.length > 0 && <div className="flow-candidate-list">{visibleCandidates.map((candidate, index) => <CandidateCard key={candidate.candidate_id} candidate={candidate} index={index} best={index === bestCandidateIndex} busy={busy} onSelect={() => void selectCandidate(candidate)} />)}</div>}
       <p className="flow-candidates-note">1차 궁합은 설문으로 계산한 예상 점수예요. 가상 동거를 마치면 실제 대화 결과로 다시 계산돼요.</p>
@@ -559,15 +580,20 @@ function App() {
       <Button secondary disabled={!saved.personaId} onClick={() => update({ step: 'comparison' })}>후보 3명 한눈에 비교하기</Button>
     </div>}
 
-    {step === 'simulation' && <div className="flow-screen"><p className="flow-lead">{activeCandidate?.alias ?? saved.candidateAlias ?? '후보'}와 7일간 함께 살아본다면?</p><p className="flow-muted">AI 대화는 실제 생활을 예측하는 참고 자료예요.</p><div className="flow-sim-progress"><SceneBars values={sceneVerdicts} done={simulation?.progress.done ?? 0} /><div className="flow-progress-meta"><span>{simulation ? statusLabel(simulation.status) : '연결 중'}</span><strong>{simulation?.progress.done ?? 0} / {simulation?.progress.total ?? 20}장면</strong></div></div>
+    {step === 'simulation' && <div className="flow-screen flow-chat"><p className="flow-lead">{activeCandidate?.alias ?? saved.candidateAlias ?? '후보'}와 7일간 함께 살아본다면?</p><p className="flow-muted">두 AI 분신이 메신저처럼 대화하며 생활 장면 20개를 함께 겪어요. 대화는 실제 생활을 예측하는 참고 자료예요.</p>
+      <div className="flow-sim-progress"><SceneBars values={shownVerdicts} done={playback.judged} /><div className="flow-progress-meta"><span>{simStatusText}</span><strong>{playback.judged} / {simulation?.progress.total ?? 20}장면</strong></div>
+        {visibleScenes.length > 0 && <DayChips days={[1, 2, 3, 4, 5, 6, 7]} active={currentDay} enabled={day => shownDays.has(day)} onSelect={day => { if (day) jumpToDay(day); }} />}
+        {visibleScenes.length > 0 && !playback.skipped && !(playback.caughtUp && simulation?.status === 'completed') && <div className="flow-chat-controls"><button type="button" onClick={() => playback.setSpeed(playback.speed === 1 ? 2 : 1)}>{playback.speed === 1 ? '▶▶ 2배 빠르게' : '▶ 보통 속도'}</button><button type="button" onClick={playback.skip}>대화 모두 보기</button></div>}
+      </div>
       {degraded && <Notice tone="warm">실시간 대화 연결이 불안정해요. 진행 상황을 확인하며, 완료되면 리포트로 이동해요.</Notice>}
-      <div className="flow-scenes" aria-live="polite" aria-relevant="additions text">{scenes.length === 0 && !degraded && <Notice>{simulation?.status === 'failed' ? '시뮬레이션이 중단됐어요.' : '두 AI가 첫 장면을 준비하고 있어요…'}</Notice>}{scenes.map(item => <article className="flow-scene" key={item.index}><div className="flow-scene-situation"><small>DAY {item.scene?.day ?? '–'} · {item.scene?.time ?? ''} · 장면 {item.index} · {item.scene?.category ?? ''}</small><h2>{item.scene?.title ?? '상황 진행 중'}</h2><p>{item.scene?.situation ?? ''}</p></div>{item.turns.map(turn => <div className={`flow-bubble ${turn.speaker === 'me' ? 'is-me' : ''}`} key={turn.turn}><span className="flow-bubble-avatar">{turn.speaker === 'me' ? '나' : activeCandidate?.alias.slice(-1) ?? '상'}</span><div><strong>{turn.name}</strong><p>{turn.text}</p></div></div>)}{item.verdict && <div className={`flow-verdict is-${item.verdict}`}><strong>{verdictLabels[item.verdict]}</strong><p>{item.reason}</p>{item.agreement && <small>합의안 · {item.agreement}</small>}{item.rule && item.verdict !== 'conflict' && <small className="flow-rule-saved">✓ 규칙 후보 저장 · {item.rule}</small>}{item.verdict === 'conflict' && item.unresolved && <small className="flow-rule-open">조율 필요 · {item.unresolved}</small>}</div>}</article>)}<div ref={sceneEndRef} /></div>
+      <div className="flow-scenes" aria-live="polite" aria-relevant="additions text">{scenes.length === 0 && !degraded && <Notice>{simulation?.status === 'failed' ? '시뮬레이션이 중단됐어요.' : '두 AI가 첫 장면을 준비하고 있어요…'}</Notice>}{visibleScenes.map((item, position) => { const view = playback.visible.get(item.index)!; const day = item.scene?.day; const newDay = day != null && day !== visibleScenes[position - 1]?.scene?.day; return <Fragment key={item.index}>{newDay && <div className="flow-day-divider" id={`sim-day-${day}`}><span>DAY {day}</span></div>}<article className="flow-scene"><div className="flow-scene-situation"><small>DAY {item.scene?.day ?? '–'} · {item.scene?.time ?? ''} · 장면 {item.index} · {item.scene?.category ?? ''}</small><h2>{item.scene?.title ?? '상황 진행 중'}</h2><p>{item.scene?.situation ?? ''}</p></div>{[...item.turns].sort((a, b) => a.turn - b.turn).slice(0, view.turns).map(turn => <div className={`flow-bubble ${turn.speaker === 'me' ? 'is-me' : ''}`} key={turn.turn}><span className="flow-bubble-avatar">{turn.speaker === 'me' ? '나' : activeCandidate?.alias.slice(-1) ?? '상'}</span><div><strong>{turn.name}</strong><p>{turn.text}</p></div></div>)}{view.verdict && item.verdict && <div className={`flow-verdict is-${item.verdict}`}><strong>{verdictLabels[item.verdict]}</strong><p>{item.reason}</p>{item.agreement && <small>합의안 · {item.agreement}</small>}{item.rule && item.verdict !== 'conflict' && <small className="flow-rule-saved">✓ 규칙 후보 저장 · {item.rule}</small>}{item.verdict === 'conflict' && item.unresolved && <small className="flow-rule-open">조율 필요 · {item.unresolved}</small>}</div>}</article></Fragment>; })}{playback.typing && <TypingBubble isMe={playback.typing.speaker === 'me'} avatar={playback.typing.speaker === 'me' ? '나' : activeCandidate?.alias.slice(-1) ?? '상'} name={playback.typing.name} />}<div ref={sceneEndRef} /></div>
+      {!following && visibleScenes.length > 0 && <button type="button" className="flow-chat-latest" onClick={scrollToLatest}>최신 대화 보기 ↓</button>}
       {error && <Notice tone="error">{error}</Notice>}
       {replayTargetId && <Notice tone="warm">요청 한도 또는 서버 장애가 발생했어요. 잠시 후 재시도하거나 리플레이로 전환할 수 있어요. 리플레이가 없으면 서버 설정에 따라 실시간 모드로 진행될 수 있습니다.</Notice>}
       {(degraded || simulation?.status === 'failed') && <Button secondary disabled={busy} onClick={() => void retrySimulation('live')}>시뮬레이션 다시 시도</Button>}
       {replayTargetId && <Button secondary disabled={busy} onClick={() => void retrySimulation('replay')}>리플레이로 전환</Button>}
       {simulation?.status === 'failed' && <Button secondary onClick={() => update({ step: 'candidates' })}>후보로 돌아가기</Button>}
-      {simulation?.status === 'completed' && <Footer><Button disabled={busy} onClick={() => void openReport()}>궁합 리포트 보기</Button></Footer>}
+      {simulation?.status === 'completed' && (playback.caughtUp ? <Footer><Button disabled={busy} onClick={() => void openReport()}>궁합 리포트 보기</Button></Footer> : <Footer><Button secondary disabled={busy} onClick={() => void openReport()}>대화 건너뛰고 리포트 보기</Button></Footer>)}
     </div>}
 
     {step === 'report' && <div className="flow-screen"><p className="flow-lead">{report?.candidate.alias ?? activeCandidate?.alias ?? '후보'}와의 궁합 리포트</p><p className="flow-muted">7일 · 20개 장면에서 확인한 생활 궁합</p>
@@ -585,7 +611,7 @@ function App() {
     </div>}
 
     {step === 'rules' && <div className="flow-screen"><p className="flow-lead">{match?.room ?? '우리 방'} 생활 규칙</p><p className="flow-muted">7일간의 대화에서 나온 약속을 정리했어요.</p>{loading && !rules && <Notice>생활 규칙을 불러오는 중이에요…</Notice>}
-      {rules && <><div className="flow-card flow-rules">{rules.rules.map((rule, index) => <div className="flow-rule" key={rule.rule_id}><span className="flow-rule-icon">{['☾', '♧', '✦', '▤', '◉', '▣'][index] ?? '•'}</span><div><strong>{rule.area_label}</strong><p>{rule.text}</p><small>출처 · {rule.source.day}일차 장면 {rule.source.scene_index} · {verdictLabels[rule.source.verdict]}</small><button className="extra-inline-link" type="button" onClick={() => update({ ruleId: rule.rule_id, step: 'ruleProposal' })}>수정 제안</button></div></div>)}</div><div className="flow-card flow-agreements"><h2>서로의 동의</h2><div><span>나</span><strong>{rules.agreements.me ? '동의 완료 ✓' : '동의 전'}</strong></div><div><span>룸메이트</span><strong>{rules.agreements.partner ? '동의 완료 ✓' : '동의 전'}</strong></div></div>{rules.status === 'confirmed' ? <Notice>두 사람 모두 동의했어요. 우리 방 생활 규칙이 확정됐습니다.</Notice> : <Notice>규칙은 시뮬레이션을 바탕으로 만든 초안이에요. 내용을 확인한 뒤 동의해 주세요.</Notice>}{rules.status === 'confirmed' && <div className="extra-actions">{isMock && <Button secondary onClick={() => update({ step: 'room' })}>우리 방 시안 미리보기</Button>}<Button secondary onClick={() => update({ step: 'memo' })}>불편 전하기 (AI 문장 다듬기)</Button><Button secondary onClick={restartExperience}>처음부터 다시 체험하기</Button></div>}{error && <Notice tone="error">{error}</Notice>}<Footer><Button disabled={busy || rules.agreements.me || rules.rules.length !== 6} onClick={() => void agree()}>{rules.status === 'confirmed' ? '생활 규칙 확정 완료' : busy ? '동의 처리 중…' : '이 규칙에 동의하기'}</Button></Footer></>}
+      {rules && <><div className="flow-card flow-rules">{rules.rules.map((rule, index) => <div className="flow-rule" key={rule.rule_id}><span className="flow-rule-icon">{['☾', '♧', '✦', '▤', '◉', '▣'][index] ?? '•'}</span><div><strong>{rule.area_label}</strong><p>{rule.text}</p><small>출처 · {rule.source.day}일차 장면 {rule.source.scene_index} · {verdictLabels[rule.source.verdict]}</small><button className="extra-inline-link" type="button" onClick={() => update({ ruleId: rule.rule_id, step: 'ruleProposal' })}>수정 제안</button></div></div>)}</div><div className="flow-card flow-agreements"><h2>서로의 동의</h2><div><span>나</span><strong>{rules.agreements.me ? '동의 완료 ✓' : '동의 전'}</strong></div><div><span>룸메이트</span><strong>{rules.agreements.partner ? '동의 완료 ✓' : '동의 전'}</strong></div></div>{rules.status === 'confirmed' ? <Notice>두 사람 모두 동의했어요. 우리 방 생활 규칙이 확정됐습니다.</Notice> : <Notice>규칙은 시뮬레이션을 바탕으로 만든 초안이에요. 내용을 확인한 뒤 동의해 주세요.</Notice>}{rules.status === 'confirmed' && <div className="extra-actions">{isMock && <Button secondary onClick={() => update({ step: 'room' })}>우리 방 시안 미리보기</Button>}<Button secondary onClick={() => update({ step: 'memo' })}>불편 전하기 (AI 문장 다듬기)</Button><Button secondary onClick={restartExperience}>처음부터 다시 시작하기</Button></div>}{error && <Notice tone="error">{error}</Notice>}<Footer><Button disabled={busy || rules.agreements.me || rules.rules.length !== 6} onClick={() => void agree()}>{rules.status === 'confirmed' ? '생활 규칙 확정 완료' : busy ? '동의 처리 중…' : '이 규칙에 동의하기'}</Button></Footer></>}
       {!rules && error && <Notice tone="error">{error}</Notice>}
     </div>}
     {step === 'comparison' && saved.personaId && <ComparisonScreen personaId={saved.personaId} onViewCandidate={candidateId => void viewComparedCandidate(candidateId)} onCandidateSelected={() => setError('')} isMock={isMock} actionError={error} actionBusy={busy} />}

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
+import { DayChips } from './ChatPlayback';
 import type { Candidate, Comparison, RephraseResult, Rule, RuleProposal, SceneResult } from '../api/types';
 
 const axisKeys = ['sleep_rhythm', 'noise_sensitivity', 'cleanliness', 'sociability', 'sharing_tolerance'] as const;
@@ -99,6 +100,7 @@ export function ComparisonScreen({ personaId, onViewCandidate, onCandidateSelect
 export function SceneReplayScreen({ simulationId }: { simulationId: string }) {
   const [scenes, setScenes] = useState<SceneResult[] | null>(null);
   const [error, setError] = useState('');
+  const [day, setDay] = useState<number | null>(null);
   useEffect(() => {
     let active = true;
     void api.getScenes(simulationId).then(result => { if (active) setScenes(result.scenes); }).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : '대화를 불러오지 못했어요.'); });
@@ -107,7 +109,8 @@ export function SceneReplayScreen({ simulationId }: { simulationId: string }) {
   return <div className="flow-screen extra-screen"><p className="flow-lead">장면별 대화 다시 보기</p><p className="extra-muted">완료된 시뮬레이션의 장면과 합의 내용을 확인해요.</p>
     {error && <ErrorMessage message={error} />}{!scenes && !error && <LoadingMessage />}
     {scenes?.length === 0 && <p className="extra-muted">표시할 장면이 없어요.</p>}
-    {scenes?.map(item => <details className="flow-card extra-scene" key={item.scene_index}><summary><span>{item.scene.day}일차 · 장면 {item.scene_index}</span><strong>{item.scene.title}</strong><small>{item.verdict === 'harmonious' ? '원만' : item.verdict === 'negotiated' ? '조율' : item.verdict === 'conflict' ? '충돌' : '판정 보류'}</small></summary><p>{item.scene.situation}</p>{item.dialogue.map(line => <div className="extra-dialogue" key={line.turn}><b>{line.name}</b><span>{line.text}</span></div>)}<div className="extra-scene-result"><strong>판정 이유</strong><p>{item.reason}</p>{item.agreement && <p>합의: {item.agreement}</p>}</div></details>)}
+    {scenes && scenes.length > 0 && <DayChips days={[...new Set(scenes.map(item => item.scene.day))].sort((a, b) => a - b)} active={day} enabled={() => true} onSelect={setDay} allLabel="전체" />}
+    {scenes?.filter(item => day === null || item.scene.day === day).map((item, index, list) => <Fragment key={item.scene_index}>{(index === 0 || list[index - 1].scene.day !== item.scene.day) && <h2 className="extra-day-header">DAY {item.scene.day}</h2>}<details className="flow-card extra-scene"><summary><span>{item.scene.day}일차 · 장면 {item.scene_index}</span><strong>{item.scene.title}</strong><small>{item.verdict === 'harmonious' ? '원만' : item.verdict === 'negotiated' ? '조율' : item.verdict === 'conflict' ? '충돌' : '판정 보류'}</small></summary><p>{item.scene.situation}</p>{item.dialogue.map(line => <div className="extra-dialogue" key={line.turn}><b>{line.name}</b><span>{line.text}</span></div>)}<div className="extra-scene-result"><strong>판정 이유</strong><p>{item.reason}</p>{item.agreement && <p>합의: {item.agreement}</p>}</div></details></Fragment>)}
   </div>;
 }
 
