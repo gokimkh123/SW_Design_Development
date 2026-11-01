@@ -14,7 +14,7 @@ export function CandidateCard({ candidate, index, best, busy, onSelect }: {
   const failed = sim?.status === 'failed';
   const running = Boolean(sim) && !done && !failed;
   const tone = done ? 'completed' : failed ? 'failed' : running ? 'running' : 'idle';
-  const status = !sim ? '시작 전 · 약 1분 소요'
+  const status = !sim ? '시작 전 · 약 2~3분'
     : done ? '가상 동거 완료'
     : failed ? '중단됨 · 다시 시작할 수 있어요'
     : sim.status === 'queued' ? '준비 중'

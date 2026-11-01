@@ -30,7 +30,7 @@ const DORM_FEATURES: { text: string; soon?: boolean }[] = [
 ];
 
 function Features({ items }: { items: { text: string; soon?: boolean }[] }) {
-  return <ul className="plans-features">{items.map(item => <li key={item.text}><span aria-hidden="true">✓</span><span>{item.text}{item.soon && <em>정식 출시 예정</em>}</span></li>)}</ul>;
+  return <ul className="plans-features">{items.map(item => <li key={item.text}><span aria-hidden="true">✓</span><span>{item.text}{item.soon && <em>곧 출시</em>}</span></li>)}</ul>;
 }
 
 export function PlansScreen() {
@@ -114,7 +114,7 @@ export function PlansScreen() {
     </div>
 
     {error && <p className="extra-error" role="alert">{error}</p>}
-    <p className="flow-notice">발표회 체험 기간에는 결제 없이 사전 신청만 받아요. 신청과 관계없이 모든 기능을 무료로 이용할 수 있어요.</p>
+    <p className="flow-notice">플러스 · 생활관 요금제는 지금 사전 신청을 받고 있어요. 정식 출시 전까지는 결제 없이 모든 기능을 이용할 수 있어요.</p>
 
     {pending && <div className="plans-sheet-backdrop" onClick={() => { if (!busy) setPending(null); }}>
       <div className="plans-sheet" role="dialog" aria-modal="true" aria-labelledby="plans-sheet-title" onClick={event => event.stopPropagation()}>

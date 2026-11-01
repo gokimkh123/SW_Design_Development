@@ -124,7 +124,7 @@ def create_simulation_router(database, seeds, runner, replay_path, error_model):
         # 동시 실행 상한: 초과분은 실패로 기록해 같은 후보로 다시 시작할 수 있게 함
         if len(runner.tasks) >= MAX_ACTIVE_SIMULATIONS:
             runner.fail(sim['simulation_id'], '동시 실행 한도를 넘었습니다.', 'LLM_RATE_LIMITED', True)
-            raise PersonaAPIError(429, 'LLM_RATE_LIMITED', '지금 체험하는 분이 많아요. 잠시 후 다시 시작해 주세요.')
+            raise PersonaAPIError(429, 'LLM_RATE_LIMITED', '지금 이용하는 분이 많아요. 잠시 후 다시 시작해 주세요.')
         try:
             runner.launch(sim['simulation_id'], engine)
         except BaseException:
