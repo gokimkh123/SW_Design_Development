@@ -27,3 +27,12 @@
 .plans-sheet p { margin: 0; color: #5f6b77; font-size: 12.5px; line-height: 1.6; }
 .plans-cta { justify-self: start; }
 .plans-grid { display: grid; gap: 18px; }
+.plans-usage { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.plans-usage small { display: block; color: #6b7680; font-size: 12.5px; font-weight: 700; }
+.plans-usage strong { color: #0b7569; font-size: 30px; font-weight: 850; letter-spacing: -.03em; }
+.plans-usage strong span { margin-left: 2px; font-size: 15px; }
+.plans-usage p { margin: 0; color: #5f6b77; font-size: 13px; text-align: right; }
+.plans-history h2 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
+.plans-history ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.plans-history li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; color: #33424e; font-size: 13.5px; }
+.plans-history time { color: #7c8994; }

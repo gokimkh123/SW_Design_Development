@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.candidates import ALIASES
 from app.database import connect_database, initialize_database
 from app.engine_adapter import resolve_mode
 from app.personas import JSON_FIELDS, PersonaData
@@ -26,7 +27,8 @@ class StorageConflictError(ValueError):
 
 
 class SimulationLimitError(RuntimeError):
-    """동시 실행 한도 초과. scope: 'user'(사용자별) 또는 'total'(서버 전체). 새 실행은 기록하지 않는다."""
+    """실행 한도 초과. scope: 'user'(사용자별 동시 실행) · 'total'(서버 전체) · 'quota'(이용 횟수 소진).
+    새 실행은 기록하지 않는다."""
 
     def __init__(self, scope: str):
         super().__init__(scope)
@@ -175,13 +177,14 @@ def _simulation(db, row):
 def create_or_reuse_simulation(db_path: Path, *, user_id: str, persona_id: str,
                                candidate: dict, alias: str, scenes: list[dict],
                                mode: str = 'live', max_running_per_user: int | None = None,
-                               max_running_total: int | None = None) -> tuple[dict, bool]:
+                               max_running_total: int | None = None,
+                               free_quota: int | None = None) -> tuple[dict, bool]:
     """실제 API 모드를 받아 (공개 Simulation, created)를 반환한다.
 
     시드는 검증·선정한 원본 dict, DB 후보는 persona_id/is_seed=false를 전달한다.
     같은 키의 running/completed를 재사용한다. 생성 시 running으로 예약하며 실행하지 않는다.
     """
-    if mode not in ('live', 'replay') or alias not in ('후보 A', '후보 B', '후보 C'):
+    if mode not in ('live', 'replay') or alias not in ALIASES:
         raise ValueError('실제 API 모드와 후보 별칭을 확인해 주세요.')
     if not scenes or len({s['scene_id'] for s in scenes}) != len(scenes):
         raise ValueError('장면 목록은 비어 있거나 ID가 중복될 수 없습니다.')
@@ -203,6 +206,14 @@ def create_or_reuse_simulation(db_path: Path, *, user_id: str, persona_id: str,
         if max_running_total is not None and db.execute(
                 "SELECT COUNT(*) FROM simulations WHERE status='running'").fetchone()[0] >= max_running_total:
             raise SimulationLimitError('total')
+        # 이용 횟수: 무료 제공분 + 구매한 이용권. 실패한 실행은 차감하지 않고, 기존 실행 재사용은 위에서 이미 반환됨
+        if free_quota is not None:
+            used = db.execute("SELECT COUNT(*) FROM simulations WHERE user_id=? AND status != 'failed'",
+                              (user_id,)).fetchone()[0]
+            bought = db.execute('SELECT COALESCE(SUM(credits), 0) FROM pass_purchases WHERE user_id=?',
+                                (user_id,)).fetchone()[0]
+            if used >= free_quota + bought:
+                raise SimulationLimitError('quota')
         if candidate.get('is_seed') is not True:
             candidate = _persona(db, candidate_id)
         else:

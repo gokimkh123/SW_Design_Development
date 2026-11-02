@@ -320,7 +320,8 @@ test('mock: A1→C2 계약 경로, 익명 후보, 20장면, 6개 규칙', async 
     [q.question_id, q.type === 'time_range' ? { bedtime: '23:00', wake: '07:00' } : q.options![0].value]));
   const persona = await mockApi.createPersona(answers);
   const candidates = (await mockApi.getCandidates(persona.persona_id)).candidates;
-  assert.equal(candidates.length, 3);
+  assert.equal(candidates.length, 6);
+  assert.deepEqual(candidates.map((item) => item.alias), ["후보 A", "후보 B", "후보 C", "후보 D", "후보 E", "후보 F"]);
   assert.equal('name' in candidates[0], false);
   const simulation = await mockApi.startSimulation(persona.persona_id, candidates[0].candidate_id);
   assert.equal((await mockApi.startSimulation(persona.persona_id, candidates[0].candidate_id)).simulation_id, simulation.simulation_id);
@@ -405,7 +406,7 @@ test('P1 mock: 장면 다시 보기→후보 비교→규칙 중재→비공개 
     assert.equal(scenes.scenes.length, 20);
     assert.equal(scenes.scenes[0].dialogue.length, 2);
     const comparison = await mockApi.getComparison(persona.persona_id);
-    assert.equal(comparison.candidates.length, 3);
+    assert.equal(comparison.candidates.length, 6);
     assert.equal(comparison.candidates[0].score, (await mockApi.getReport(simulation.simulation_id)).score);
     assert.equal(comparison.candidates[0].expected_conflicts_per_month, 0.5);
     assert.equal(comparison.candidates[1].expected_conflicts_per_month, null);
@@ -470,4 +471,31 @@ test('P1 mock: 두 매치의 규칙 제안·수락은 다른 매치를 바꾸지
   const accepted = await mockApi.acceptProposal(proposal.proposal_id);
   assert.equal((await mockApi.getRules(second.match_id)).rules[0].text, accepted.text);
   assert.equal((await mockApi.getRules(first.match_id)).rules[0].text, firstRules.rules[0].text);
+});
+
+test('mock: 무료 가상 동거 횟수 소진 시 402 · 이용권 구매 후 재개 · 궁합 진단', async () => {
+  setUserId('usr_pass_test');
+  const survey = await mockApi.getSurvey();
+  const answers: Answers = Object.fromEntries(survey.questions.map((q) =>
+    [q.question_id, q.type === 'time_range' ? { bedtime: '23:00', wake: '07:00' } : q.options![0].value]));
+  const persona = await mockApi.createPersona(answers);
+  const candidates = (await mockApi.getCandidates(persona.persona_id)).candidates;
+  let blocked: ApiError | null = null;
+  let index = 0;
+  for (; index < candidates.length; index += 1) {
+    try { await mockApi.startSimulation(persona.persona_id, candidates[index].candidate_id); }
+    catch (error) { blocked = error as ApiError; break; }
+  }
+  assert.ok(blocked, '무료 횟수를 넘기면 거절되어야 함');
+  assert.equal(blocked.status, 402);
+  assert.equal(blocked.code, 'PASS_REQUIRED');
+  const before = await mockApi.getPasses();
+  assert.equal(before.remaining, 0);
+  const after = await mockApi.buyPass('pass_5');
+  assert.equal(after.purchased - before.purchased, 5);
+  assert.equal(after.remaining, 5);
+  await mockApi.startSimulation(persona.persona_id, candidates[index].candidate_id);
+  assert.equal((await mockApi.getPasses()).remaining, 4);
+  const diagnosis = await mockApi.getDiagnosis(persona.persona_id);
+  assert.ok(diagnosis.factors.length > 0 && diagnosis.factors[0].tips.length > 0);
 });

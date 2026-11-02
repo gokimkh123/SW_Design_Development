@@ -81,6 +81,9 @@
 .flow-avatar { display: grid; place-items: center; width: 49px; height: 49px; flex: none; border-radius: 50%; background: #ece5ff; color: #7954b9; font-size: 19px; font-weight: 850; }
 .flow-avatar--1 { background: #fff0dd; color: #ef973b; }
 .flow-avatar--2 { background: #e1f3fb; color: #479cc4; }
+.flow-avatar--3 { background: #e5f6e8; color: #3f9a55; }
+.flow-avatar--4 { background: #fde7f1; color: #cc4f8a; }
+.flow-avatar--5 { background: #eceef1; color: #5b6b7a; }
 .flow-candidate-head > div:nth-child(2) { min-width: 0; flex: 1; }
 .flow-candidate h2 { margin: 0 0 3px; font-size: 16px; }
 .flow-candidate p { margin: 0; color: #6c7c89; font-size: 11px; }

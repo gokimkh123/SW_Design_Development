@@ -1,4 +1,4 @@
-# 기능: P1 화면용 API(API.md 4.16) — 장면별 대화 다시 보기, 후보 비교, 규칙 수정 제안 · 수락, 불편 문장 변환.
+# 기능: P1 화면용 API(API.md 4.16) — 장면별 대화 다시 보기, 후보 비교, 궁합 진단, 규칙 수정 제안 · 수락, 불편 문장 변환.
 # 시스템 범위: 소유자 확인 후 기존 저장소 · 엔진 어댑터를 호출하며, 엔진 호출 중에는 DB 연결을 열어 두지 않는다.
 # 결과: 명세 응답 또는 공통 오류 형식(401 · 404 · 409 · 422 · 503)을 반환한다. 불편 메모 원문은 저장 · 기록하지 않는다.
 import asyncio
@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app import matches as match_store, simulations as sim_store
 from app.candidates import select_candidates
+from app.diagnosis import diagnose
 from app.engine_adapter import EngineAdapter, EngineError, get_engine
 from app.persona_api import PersonaAPIError
 from app.personas import get_persona
@@ -121,6 +122,15 @@ def create_p1_router(database, seeds, error_model):
         return {'me': {'axes': persona['axes']},
                 'candidates': [{k: v for k, v in row.items() if k != '_rank'} for row in rows],
                 'recommended_candidate_id': best['candidate_id'] if best else None}
+
+    @router.get('/api/personas/{persona_id}/diagnosis', responses=errors)
+    def diagnosis(persona_id: str, x_user_id: Annotated[str | None, Header()] = None):
+        """궁합 진단: 잘 맞는 후보가 적은 이유(점수를 낮추는 성향)와 조정 시 늘어나는 후보 수."""
+        require_user(x_user_id)
+        persona = get_persona(database, persona_id, user_id=x_user_id)
+        if persona is None:
+            raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
+        return diagnose(persona, seeds)
 
     @router.post('/api/rules/{rule_id}/proposals', status_code=201,
                  responses={**errors, 503: {'model': error_model}})

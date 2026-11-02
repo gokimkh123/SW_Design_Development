@@ -76,7 +76,7 @@ def test_start_parallel_reuse_and_complete(context):
             assert impl.calls == 1
             assert store.get_simulation(db, sid)['progress']['done'] == 0
             # 세 후보 작업을 동시에 예약하며 첫 작업은 아직 gate에서 대기한다.
-            for card in select_candidates(me, SEEDS).candidates[1:]:
+            for card in select_candidates(me, SEEDS).candidates[1:3]:  # 무료 3회 범위
                 r = await client.post('/api/simulations', json=dict(payload, candidate_id=card.candidate_id), headers=headers)
                 assert r.status_code == 202
             impl.gate.set()

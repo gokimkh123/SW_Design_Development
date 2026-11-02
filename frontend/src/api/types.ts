@@ -165,12 +165,48 @@ export interface RephraseResult {
   suggested_rule: { area: string; text: string };
 }
 
-/** 멤버십 사전 구독 신청 (API.md 4.17). 결제 미연동 · 플랜만 기록 */
+/** 생활관 도입 요청 (API.md 4.17). 학생 개인 결제 없음 · 요청 여부만 기록 */
 export type SubscriptionPlan = 'plus_monthly' | 'plus_semester' | 'dorm';
 
 export interface Subscription {
   plan: SubscriptionPlan | null;
   updated_at: string | null;
+}
+
+/** 가상 동거 이용권 (API.md 4.18). 베이직 무료 횟수 + 구매 횟수 */
+export type PassProduct = 'pass_5' | 'pass_15';
+
+export interface PassPurchase { purchase_id: string; product: PassProduct; credits: number; price: number; created_at: string }
+
+export interface PassSummary {
+  free_quota: number;
+  purchased: number;
+  used: number;
+  remaining: number;
+  purchases: PassPurchase[];
+}
+
+/** 궁합 진단 (API.md 4.16): 잘 맞는 후보가 적은 이유와 습관 조정 제안 */
+export interface DiagnosisFactor {
+  axis: keyof Axes;
+  label: string;
+  summary: string;
+  my_value: number;
+  pool_median: number;
+  far_count: number;
+  score_loss: number;
+  tips: string[];
+  good_after_adjust: number;
+}
+
+export interface Diagnosis {
+  pool_size: number;
+  good_score: number;
+  good_count: number;
+  level: 'good' | 'limited' | 'hard';
+  best_score: number | null;
+  factors: DiagnosisFactor[];
+  best_adjustment: { axes: (keyof Axes)[]; labels: string[]; good_before: number; good_after: number } | null;
 }
 
 export type SimulationEvent =
@@ -204,5 +240,8 @@ export interface ApiClient {
   getSubscription(): Promise<Subscription>;
   saveSubscription(plan: SubscriptionPlan): Promise<Subscription>;
   cancelSubscription(): Promise<Subscription>;
+  getPasses(): Promise<PassSummary>;
+  buyPass(product: PassProduct): Promise<PassSummary>;
+  getDiagnosis(personaId: string): Promise<Diagnosis>;
   subscribeSimulation(id: string, onEvent: (event: SimulationEvent) => void, onError: (error: Error) => void): () => void;
 }
