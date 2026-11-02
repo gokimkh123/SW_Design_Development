@@ -1,5 +1,5 @@
 import type {
-  Answers, ApiClient, Candidate, Comparison, Diagnosis, Match, PassProduct, PassSummary, Persona, RephraseResult, Report,
+  Answers, ApiClient, Candidate, CommunityBoard, CommunityPost, CommunityPostSummary, Comparison, Diagnosis, PostInput, ReactionResult, Match, PassProduct, PassSummary, Persona, RephraseResult, Report,
   Health, Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Subscription,
   SubscriptionPlan, Survey, User,
 } from './types';
@@ -183,5 +183,14 @@ export const realApi: ApiClient = {
   getPasses: () => request<PassSummary>('/passes/me'),
   buyPass: (product: PassProduct) => request<PassSummary>('/passes', 'POST', { product }),
   getDiagnosis: (personaId: string) => request<Diagnosis>(`/personas/${encodeURIComponent(personaId)}/diagnosis`),
+  listPosts: (board: CommunityBoard) => request<{ posts: CommunityPostSummary[] }>(`/community/posts?board=${board}`),
+  createPost: (input: PostInput) => request<CommunityPost>('/community/posts', 'POST', input),
+  getPost: (postId: string) => request<CommunityPost>(`/community/posts/${encodeURIComponent(postId)}`),
+  deletePost: (postId: string) => request<{ deleted: boolean }>(`/community/posts/${encodeURIComponent(postId)}`, 'DELETE'),
+  addComment: (postId: string, body: string) => request<CommunityPost>(`/community/posts/${encodeURIComponent(postId)}/comments`, 'POST', { body }),
+  deleteComment: (commentId: string) => request<CommunityPost>(`/community/comments/${encodeURIComponent(commentId)}`, 'DELETE'),
+  likePost: (postId: string) => request<ReactionResult>(`/community/posts/${encodeURIComponent(postId)}/like`, 'POST'),
+  reportPost: (postId: string) => request<ReactionResult>(`/community/posts/${encodeURIComponent(postId)}/report`, 'POST'),
+  reportComment: (commentId: string) => request<ReactionResult>(`/community/comments/${encodeURIComponent(commentId)}/report`, 'POST'),
   subscribeSimulation,
 };

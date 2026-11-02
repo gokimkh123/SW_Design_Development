@@ -97,6 +97,7 @@ sequenceDiagram
 | 21 | GET · PUT · DELETE | `/api/subscriptions/me` | 생활관 도입 요청 조회 · 요청 · 취소 | 부가 | 건한 | 이용권 |
 | 22 | GET · POST | `/api/passes/me` · `/api/passes` | 가상 동거 이용 현황 조회 · 이용권 구매 | 부가 | 건한 | 이용권 |
 | 23 | GET | `/api/personas/{persona_id}/diagnosis` | 궁합 진단 (잘 맞는 후보가 적은 이유 · 습관 조정 제안) | 부가 | 건한 | B1 |
+| 24 | GET · POST · DELETE | `/api/community/...` | 기숙사 커뮤니티 (자유게시판 · 애로사항 제안, 익명 댓글 · 공감 · 신고) | 부가 | 건한 | 커뮤니티 |
 | 21 | POST | `/api/matches/{match_id}/accept` | 상대 수락 (실사용자끼리 매칭) | P2 | - | - |
 
 ---
@@ -611,6 +612,42 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 - 사용자당 누적 구매 상한 60회 초과 시 `409 PASS_LIMIT`
 - `X-User-Id` 필수(`401 USER_REQUIRED`), 정의되지 않은 상품 · 추가 필드 `422 VALIDATION_ERROR`
 
+### 4.19 기숙사 커뮤니티
+
+생활관 학생 간 대화(자유게시판 `free`)와 생활 불편 제안(애로사항 `grievance`)을 위한 익명 게시판이다. 작성자는 `user_id`로만 연결하며, 응답에는 사용자 ID · 닉네임을 포함하지 않는다. 시드(예시) 글은 두지 않는다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/community/posts?board=free` | 글 목록(최신 50건, 공개 글만) → `{ "posts": [PostSummary] }` |
+| POST | `/api/community/posts` | 글 작성 `{ "board": "grievance", "category": "소음", "title": "…", "body": "…" }` → `201` PostDetail |
+| GET | `/api/community/posts/{post_id}` | 글 상세 + 댓글 → PostDetail |
+| DELETE | `/api/community/posts/{post_id}` | 본인 글 삭제 → `{ "deleted": true }` |
+| POST | `/api/community/posts/{post_id}/comments` | 댓글 작성 `{ "body": "…" }` → `201` PostDetail |
+| DELETE | `/api/community/comments/{comment_id}` | 본인 댓글 삭제 → PostDetail |
+| POST | `/api/community/posts/{post_id}/like` | 공감(1인 1회, 취소 없음) → ReactionResult |
+| POST | `/api/community/posts/{post_id}/report` · `/api/community/comments/{comment_id}/report` | 신고(1인 1회) → ReactionResult |
+
+```jsonc
+// PostDetail (PostSummary는 body · liked · reported · comments 제외, excerpt 80자)
+{
+  "post_id": "pst_1a2b3c4d5e6f7a8b", "board": "grievance", "category": "소음",
+  "title": "밤 12시 이후 복도 통화 소음", "excerpt": "자정 이후 복도에서…", "body": "자정 이후 복도에서…",
+  "like_count": 5, "comment_count": 1, "created_at": "2026-11-02T22:40:00+09:00",
+  "is_mine": false, "forwarded": true, "liked": true, "reported": false,
+  "comments": [ { "comment_id": "cmt_…", "author": "익명1", "body": "동의합니다", "created_at": "…", "is_mine": false } ]
+}
+// ReactionResult
+{ "like_count": 5, "liked": true, "reported": false, "hidden": false }
+```
+
+- 익명 표시: 글쓴이의 댓글은 `글쓴이`, 그 외는 글마다 처음 댓글을 단 순서대로 `익명1` · `익명2` …(같은 사용자는 같은 번호)
+- 애로사항 분류: `시설` · `소음` · `청결` · `식당` · `안전` · `기타`(생략 시 `기타`). 공감 5개 이상이면 `forwarded: true`(생활관 전달 대상)
+- 길이: 제목 2~40자, 본문 2~1,000자, 댓글 1~300자(앞뒤 공백 제외)
+- 내용 제한: 욕설 · 비하 표현(기호 제거 후 검사, 띄어쓰기는 유지하여 "감염병 신고" 등 정상 문장 오판 방지. 자음 약어는 띄어쓰기도 제거), 전화번호, 링크 포함 시 `422 CONTENT_REJECTED`
+- 작성 제한: 글 10초 간격 · 하루 30건, 댓글 3초 간격 · 하루 100건 초과 시 `429 TOO_MANY_POSTS`
+- 신고 3회 누적 시 글 · 댓글을 자동 숨김(`hidden: true`, 이후 조회 `404 POST_NOT_FOUND` · 목록 제외). 운영 중 부적절한 글은 재배포 없이 신고로 숨길 수 있음
+- 본인 글 공감 · 신고 `409 OWN_CONTENT`, 타인 글 · 댓글 삭제 `403 NOT_OWNER`
+
 ---
 
 ## 5. 실시간 이벤트 (SSE)
@@ -680,9 +717,14 @@ const reader = res.body!.getReader();
 | 400 | `SURVEY_INCOMPLETE` | 12문항 중 응답 누락 |
 | 401 | `USER_REQUIRED` | `X-User-Id` 누락 또는 미등록 사용자 |
 | 402 | `PASS_REQUIRED` | 가상 동거 이용 가능 횟수 소진, 이용권 구매 필요 |
+| 403 | `NOT_OWNER` | 본인 글 · 댓글이 아닌 대상 삭제 |
 | 404 | `USER_NOT_FOUND` · `PERSONA_NOT_FOUND` · `SIMULATION_NOT_FOUND` · `MATCH_NOT_FOUND` · `RULE_NOT_FOUND` · `PROPOSAL_NOT_FOUND` | 대상 없음 |
 | 409 | `SIMULATION_NOT_COMPLETED` | 시뮬레이션 완료 전 리포트 · 매칭 요청 |
 | 409 | `PASS_LIMIT` | 이용권 누적 구매 상한(60회) 초과 |
+| 409 | `OWN_CONTENT` | 본인 글 공감 · 신고 |
+| 404 | `POST_NOT_FOUND` · `COMMENT_NOT_FOUND` | 삭제 · 신고 숨김 처리된 글 · 댓글 |
+| 422 | `CONTENT_REJECTED` | 욕설 · 비하 표현, 연락처, 링크 포함 |
+| 429 | `TOO_MANY_POSTS` | 커뮤니티 작성 간격 · 하루 작성 수 초과 |
 | 422 | `VALIDATION_ERROR` | 형식 오류 (FastAPI 기본 422 응답을 본 형식으로 변환) |
 | 429 | `LLM_RATE_LIMITED` | LLM 분당 한도 초과, 잠시 후 재시도 |
 | 503 | `LLM_UNAVAILABLE` | LLM 호출 실패, 부스에서는 리플레이 모드 전환 |
