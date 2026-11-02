@@ -16,6 +16,7 @@ from app.match_api import create_match_router
 from app.p1_api import create_p1_router
 from app.subscription_api import create_subscription_router
 from app.pass_api import create_pass_router
+from app.community_api import create_community_router
 from app.simulation_api import create_simulation_router
 from app.simulation_runner import SimulationRunner
 from app.engine_adapter import EngineError
@@ -63,7 +64,7 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
     @application.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
         if request.url.path.startswith(('/api/personas', '/api/simulations', '/api/matches', '/api/rules',
-                                        '/api/proposals', '/api/mediation', '/api/subscriptions', '/api/passes')):
+                                        '/api/proposals', '/api/mediation', '/api/subscriptions', '/api/passes', '/api/community')):
             return error_response(422, 'VALIDATION_ERROR', '요청 JSON의 필드·자료형과 문구 길이를 확인해 주세요.')
         return error_response(422, 'VALIDATION_ERROR', '요청 JSON 형식을 확인해 주세요. 닉네임은 앞뒤 공백을 제외한 1~10자 문자열이어야 해요.')
 
@@ -108,6 +109,7 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
     application.include_router(create_p1_router(database, seeds, ErrorResponse))
     application.include_router(create_subscription_router(database, ErrorResponse))
     application.include_router(create_pass_router(database, ErrorResponse))
+    application.include_router(create_community_router(database, ErrorResponse))
     return application
 
 

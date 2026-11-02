@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 
-export type AppTab = 'room' | 'match' | 'persona' | 'plans' | 'all';
+export type AppTab = 'room' | 'match' | 'persona' | 'community' | 'plans' | 'all';
 
 type AppShellProps = {
   children: ReactNode;
@@ -22,6 +22,7 @@ const tabs: { id: AppTab; label: string; icon: IconName }[] = [
   { id: 'room', label: '우리 방', icon: 'room' },
   { id: 'match', label: '매칭', icon: 'match' },
   { id: 'persona', label: '페르소나', icon: 'persona' },
+  { id: 'community', label: '커뮤니티', icon: 'community' },
   { id: 'plans', label: '이용권', icon: 'plans' },
   { id: 'all', label: '전체', icon: 'all' },
 ];
