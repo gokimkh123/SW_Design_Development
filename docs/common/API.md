@@ -59,7 +59,7 @@ sequenceDiagram
     API->>ENG: build_persona()
     API-->>FE: 페르소나 카드
     FE->>API: GET /personas/ID/candidates
-    loop 후보 3명
+    loop 후보 6명
         FE->>API: POST /simulations
         FE->>API: GET /simulations/ID/events (SSE)
         API->>ENG: simulate()
@@ -80,7 +80,7 @@ sequenceDiagram
 | 4 | POST | `/api/personas` | 응답 → 페르소나 생성 | P0 | 일준 | A4 |
 | 5 | GET | `/api/personas/{persona_id}` | 페르소나 조회 | P0 | 일준 | A4 |
 | 6 | PATCH | `/api/personas/{persona_id}` | 꼭 지켜줘 · 괜찮아요 수정 | P0 | 일준 | A4 |
-| 7 | GET | `/api/personas/{persona_id}/candidates` | 후보 3명 | P0 | 일준 | B1 |
+| 7 | GET | `/api/personas/{persona_id}/candidates` | 후보 6명 | P0 | 일준 | B1 |
 | 8 | POST | `/api/simulations` | 시뮬레이션 시작 | P0 | 일준 | B1 · B2 |
 | 9 | GET | `/api/simulations/{simulation_id}` | 상태 · 진행률 | P0 | 일준 | B1 · B2 |
 | 10 | GET | `/api/simulations/{simulation_id}/events` | 실시간 이벤트 (SSE) | P0 | 일준 | B2 |
@@ -94,7 +94,9 @@ sequenceDiagram
 | 18 | POST | `/api/rules/{rule_id}/proposals` | 규칙 수정 제안 → AI 중재안 | P1 | 범찬 | C3 |
 | 19 | POST | `/api/proposals/{proposal_id}/accept` | 중재안 수락 | P1 | 범찬 | C3 |
 | 20 | POST | `/api/mediation/rephrase` | 불편 메모 → 요청형 문장 | P1 | 일준 | D2 |
-| 21 | GET · PUT · DELETE | `/api/subscriptions/me` | 멤버십 사전 구독 신청 조회 · 신청(변경) · 취소 | 부가 | 건한 | 멤버십 |
+| 21 | GET · PUT · DELETE | `/api/subscriptions/me` | 생활관 도입 요청 조회 · 요청 · 취소 | 부가 | 건한 | 이용권 |
+| 22 | GET · POST | `/api/passes/me` · `/api/passes` | 가상 동거 이용 현황 조회 · 이용권 구매 | 부가 | 건한 | 이용권 |
+| 23 | GET | `/api/personas/{persona_id}/diagnosis` | 궁합 진단 (잘 맞는 후보가 적은 이유 · 습관 조정 제안) | 부가 | 건한 | B1 |
 | 21 | POST | `/api/matches/{match_id}/accept` | 상대 수락 (실사용자끼리 매칭) | P2 | - | - |
 
 ---
@@ -162,7 +164,7 @@ sequenceDiagram
 }
 ```
 
-- 매칭 전 이름 미제공, `alias`는 1차 점수 순 후보 A · B · C
+- 매칭 전 이름 미제공, `alias`는 1차 점수 순 후보 A ~ F
 - `simulation`: 미시작 시 `null`
 
 ### Simulation
@@ -416,11 +418,11 @@ sequenceDiagram
 
 ### 4.7 GET /api/personas/{persona_id}/candidates
 
-- 시드 후보 풀(10명, 본인 제외) 중 1차 점수 상위 3명 반환
+- 시드 후보 풀(10명, 본인 제외) 중 1차 점수 상위 6명 반환
 
 ```jsonc
 // 200
-{ "candidates": [ /* Candidate × 3, pre_score 내림차순 */ ] }
+{ "candidates": [ /* Candidate × 최대 6, pre_score 내림차순 */ ] }
 ```
 
 오류: `404 PERSONA_NOT_FOUND`
@@ -436,7 +438,9 @@ sequenceDiagram
 
 - `mode`: `live`(기본) 또는 `replay`. `replay` 요청 시 사전 생성 파일이 없으면 `live`로 실행, 응답 `mode`에 실제 실행 모드 표기
 - 동일 페르소나 · 후보 · 모드의 `running` 또는 `completed` 시뮬레이션 존재 시 신규 생성 없이 `200`으로 기존 건 반환
-- 오류: `404 PERSONA_NOT_FOUND`
+- 이용 횟수: 신규 생성 시 사용 횟수(실패 제외 시뮬레이션 수)가 무료 3회 + 구매 횟수 이상이면 행을 기록하지 않고 `402 PASS_REQUIRED` 반환. 기존 건 재사용은 차감하지 않음
+- 동시 실행 한도: 사용자당 6건, 서버 전체 30건 초과 시 `429 LLM_RATE_LIMITED`
+- 오류: `402 PASS_REQUIRED` · `404 PERSONA_NOT_FOUND` · `429 LLM_RATE_LIMITED`
 
 ### 4.9 GET /api/simulations/{simulation_id}
 
@@ -539,15 +543,35 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 
 - 메모 원문 미저장 · 상대 미전달
 
-### 4.17 멤버십 사전 구독 신청
+**GET /api/personas/{persona_id}/diagnosis** — 궁합 진단
 
-발표회 체험판은 결제를 연동하지 않으며, 사용자별로 선택한 플랜만 기록한다. 카드 · 계좌 · 연락처 등 결제 · 개인 정보는 받지 않는다.
+```jsonc
+// 200
+{
+  "pool_size": 10, "good_score": 75, "good_count": 2, "level": "limited", "best_score": 81,
+  "factors": [
+    { "axis": "noise_sensitivity", "label": "소음 민감도", "summary": "소리에 예민한 편이에요",
+      "my_value": 100, "pool_median": 33, "far_count": 7, "score_loss": 15.0,
+      "tips": ["귀마개 · 백색소음으로 스스로 대비하는 방법을 먼저 마련해 보세요.", "…"], "good_after_adjust": 3 }
+  ],
+  "best_adjustment": { "axes": ["noise_sensitivity"], "labels": ["소음 민감도"], "good_before": 2, "good_after": 3 }
+}
+```
 
-| 플랜 ID | 화면 표기 | 가격(화면 안내) |
+- 목적: 어느 후보와도 잘 맞지 않는 사용자에게 원인(점수를 낮추는 생활 성향)과 개선 방향(습관 조정 제안)을 제시
+- `good_count`: 후보 풀 중 1차 점수 `good_score`(75점) 이상 인원. `level`: 3명 이상 `good`, 1~2명 `limited`, 0명 `hard`
+- `factors`: 축별 평균 점수 손실(가중치 × 평균 차이) 상위 3개. 후보 풀 중앙값과 차이가 15 미만이면 `summary`는 "후보들과 비슷한 편이에요", `tips`는 빈 목록
+- `best_adjustment`: 축 값을 후보 풀 중앙값 쪽으로 최대 25만큼 옮겼을 때 잘 맞는 후보가 늘어나는 조정. 한 축으로 늘지 않으면 손실 상위 2~3개 축을 함께 조정한 결과, 그래도 늘지 않으면 `null`
+- 후보 개인 정보(이름 · 소개)는 응답에 포함하지 않음. 오류: `401 USER_REQUIRED` · `404 PERSONA_NOT_FOUND`
+
+### 4.17 생활관 도입 요청
+
+학생이 소속 생활관의 서비스 도입을 요청한 사실만 사용자별로 기록한다. 생활관 요금(입사생 1인당 학기 2,000원)은 생활관이 부담하며, 학생 개인에게는 청구하지 않는다. 연락처 등 개인 정보는 받지 않는다.
+
+| 플랜 ID | 화면 표기 | 비고 |
 | --- | --- | --- |
-| `plus_semester` | 플러스 학기 패스 | 9,900원 / 6개월 |
-| `plus_monthly` | 플러스 월간 | 2,900원 / 월 |
-| `dorm` | 생활관 도입 관심 | 입사생 1인당 학기 2,000원 |
+| `dorm` | 우리 생활관에 도입 요청 | 현재 화면에서 사용하는 유일한 값 |
+| `plus_semester` · `plus_monthly` | (사용 중지) | 이전 요금제 기록 호환용. 개인 요금은 4.18 이용권으로 대체 |
 
 **GET /api/subscriptions/me** — `200`
 
@@ -561,6 +585,31 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 
 - `X-User-Id` 필수(없거나 미등록 `401 USER_REQUIRED`), 정의되지 않은 플랜 · 추가 필드 `422 VALIDATION_ERROR`
 - 신청 수는 화면에 공개하지 않음
+
+### 4.18 가상 동거 이용권
+
+룸메이트는 입사 신청 시기에 한 번 정하므로 월 구독 대신 횟수제 이용권으로 운영한다. 베이직 사용자는 가상 동거 3회를 무료로 이용하고, 추가 횟수는 이용권으로 충전한다. 카드 · 계좌 등 결제 정보는 저장하지 않는다(`pass_purchases`에는 상품 · 횟수 · 금액 · 시각만 기록).
+
+| 상품 ID | 화면 표기 | 횟수 | 가격 | 회당 |
+| --- | --- | --- | --- | --- |
+| `pass_5` | 플러스 이용권 5회 | 5 | 2,900원 | 580원 |
+| `pass_15` | 플러스 이용권 15회 | 15 | 6,900원 | 460원 |
+
+**GET /api/passes/me** — `200`
+
+```jsonc
+{
+  "free_quota": 3, "purchased": 5, "used": 4, "remaining": 4,
+  "purchases": [ { "purchase_id": "pas_1a2b3c4d5e6f7a8b", "product": "pass_5", "credits": 5, "price": 2900,
+                   "created_at": "2026-11-02T22:10:00+09:00" } ]
+}
+```
+
+**POST /api/passes** — 요청 `{ "product": "pass_5" }`, `201` → 위와 같은 형식
+
+- `used`: 실패를 제외한 시뮬레이션 수. `remaining` = max(0, `free_quota` + `purchased` − `used`)
+- 사용자당 누적 구매 상한 60회 초과 시 `409 PASS_LIMIT`
+- `X-User-Id` 필수(`401 USER_REQUIRED`), 정의되지 않은 상품 · 추가 필드 `422 VALIDATION_ERROR`
 
 ---
 
@@ -630,8 +679,10 @@ const reader = res.body!.getReader();
 | --- | --- | --- |
 | 400 | `SURVEY_INCOMPLETE` | 12문항 중 응답 누락 |
 | 401 | `USER_REQUIRED` | `X-User-Id` 누락 또는 미등록 사용자 |
+| 402 | `PASS_REQUIRED` | 가상 동거 이용 가능 횟수 소진, 이용권 구매 필요 |
 | 404 | `USER_NOT_FOUND` · `PERSONA_NOT_FOUND` · `SIMULATION_NOT_FOUND` · `MATCH_NOT_FOUND` · `RULE_NOT_FOUND` · `PROPOSAL_NOT_FOUND` | 대상 없음 |
 | 409 | `SIMULATION_NOT_COMPLETED` | 시뮬레이션 완료 전 리포트 · 매칭 요청 |
+| 409 | `PASS_LIMIT` | 이용권 누적 구매 상한(60회) 초과 |
 | 422 | `VALIDATION_ERROR` | 형식 오류 (FastAPI 기본 422 응답을 본 형식으로 변환) |
 | 429 | `LLM_RATE_LIMITED` | LLM 분당 한도 초과, 잠시 후 재시도 |
 | 503 | `LLM_UNAVAILABLE` | LLM 호출 실패, 부스에서는 리플레이 모드 전환 |

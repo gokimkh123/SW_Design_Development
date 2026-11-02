@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 
 from app.match_schema import SCHEMAS as MATCH_SCHEMAS
+from app.service_schema import SCHEMAS as SERVICE_SCHEMAS
 from app.simulation_schema import SCHEMAS as SIMULATION_SCHEMAS, INDEXES
 
 SCHEMAS = {
@@ -34,6 +35,7 @@ SCHEMAS = {
 
 SCHEMAS.update(SIMULATION_SCHEMAS)
 SCHEMAS.update(MATCH_SCHEMAS)
+SCHEMAS.update(SERVICE_SCHEMAS)
 
 
 class SchemaConflictError(RuntimeError):
@@ -83,7 +85,7 @@ def initialize_database(db_path: Path) -> None:
                         _structure(db, table) != _structure(expected, table)):
                     raise SchemaConflictError(f'{table} 테이블 구조 충돌: 기존 데이터를 보존했습니다. 수동 검토가 필요합니다.')
             # 추가 테이블의 CHECK와 부분 UNIQUE 조건도 비교한다. 충돌 시 DDL 전에 중단한다.
-            for name in (*SIMULATION_SCHEMAS, *MATCH_SCHEMAS, *INDEXES):
+            for name in (*SIMULATION_SCHEMAS, *MATCH_SCHEMAS, *SERVICE_SCHEMAS, *INDEXES):
                 if name in existing:
                     actual = db.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0]
                     wanted = expected.execute('SELECT sql FROM sqlite_master WHERE name=?', (name,)).fetchone()[0]

@@ -184,7 +184,7 @@ with TemporaryDirectory() as directory:
 
 ## 후보 추림 API (B1)
 
-- `GET /api/personas/{persona_id}/candidates`: 본인 페르소나와 시드 후보의 생활 성향을 비교하여 상위 최대 3명을 반환한다. 요청 본문은 없고 `X-User-Id` 헤더가 필요하다.
+- `GET /api/personas/{persona_id}/candidates`: 본인 페르소나와 시드 후보의 생활 성향을 비교하여 상위 최대 6명을 반환한다. 요청 본문은 없고 `X-User-Id` 헤더가 필요하다.
 - `app/persona_api.py`에서 등록 사용자·페르소나 소유자를 확인하고, `app/candidates.py`에서 후보 검증·점수 계산·정렬을 수행한다.
 - 기본 후보 원본은 저장소의 `data/seed/personas.json`이다. 요청마다 파일을 읽으며 `candidate_pool=true`인 시드를 대상으로 한다. 조회 페르소나와 `persona_id` 또는 `user_id`가 같은 시드는 제외한다. 시드 내용을 사용자 DB로 복사하지 않는다.
 
@@ -247,7 +247,7 @@ with TemporaryDirectory() as directory:
 2. `POST /api/users`로 사용자를 생성하고 `user_id`를 복사한다. 이미 만든 사용자가 있으면 해당 ID를 사용해도 된다.
 3. 위 페르소나 API 예시대로 `POST /api/personas`에 사용자 헤더와 설문 답변을 보내고 반환된 `persona_id`를 복사한다.
 4. `GET /api/personas/{persona_id}/candidates` → **Try it out**을 누른다. `persona_id`에 3번 값을, `X-User-Id`에 2번 값을 넣고 **Execute**를 누른다.
-5. 200 응답에 최대 3명의 후보, 점수 내림차순, A·B·C 별칭, `simulation: null`이 표시되는지 확인한다.
+5. 200 응답에 최대 6명의 후보, 점수 내림차순, A~F 별칭, `simulation: null`이 표시되는지 확인한다.
 6. 사용자 헤더를 비우면 401, 존재하지 않는 페르소나 또는 다른 사용자 헤더로 조회하면 404인지 확인한다.
 
 이 수동 확인 과정의 사용자·페르소나 생성은 서버가 사용하는 개발 DB에 저장된다. 아래 자동 테스트는 임시 DB·시드 파일을 사용하여 실제 개발 데이터를 변경하지 않는다.
@@ -385,7 +385,7 @@ PY
 
 작업 1~4는 기존 범찬 담당 연결 부분까지 일준이 진행한다. 작업 2는 `POST /api/simulations`와 `app/simulation_runner.py`를 연결한다. 작업 2 자체는 시작·실행만 담당하며 상태 조회·SSE는 아래 작업 3에서 연결한다. 완료 리포트는 아래 작업 4에서 제공하며 매칭·규칙 API와 프론트엔드는 후속 범위다. 후보 카드의 `simulation: null`도 유지한다.
 
-- 요청: `X-User-Id` 헤더와 `{"persona_id":"...","candidate_id":"...","mode":"live"}`. mode 생략 시 live. 등록 사용자와 본인 페르소나를 확인하고 기존 `select_candidates` 상위 3명만 허용한다. 헤더 누락/미등록은 401 USER_REQUIRED, 비소유/없는 페르소나/선택 불가 후보는 404 PERSONA_NOT_FOUND, 잘못된 JSON·필드·mode는 422 VALIDATION_ERROR다.
+- 요청: `X-User-Id` 헤더와 `{"persona_id":"...","candidate_id":"...","mode":"live"}`. mode 생략 시 live. 등록 사용자와 본인 페르소나를 확인하고 기존 `select_candidates` 상위 6명만 허용한다. 헤더 누락/미등록은 401 USER_REQUIRED, 비소유/없는 페르소나/선택 불가 후보는 404 PERSONA_NOT_FOUND, 잘못된 JSON·필드·mode는 422 VALIDATION_ERROR다.
 - 신규는 202 + 공통 Simulation 모델, 동일 페르소나·후보·실제 모드의 running/completed는 200 + 기존 모델. `BEGIN IMMEDIATE`와 기존 부분 UNIQUE 인덱스가 중복 예약을 막고, created=true일 때만 task를 등록한다. 응답은 전체 엔진 실행을 기다리지 않는다. failed는 새 ID로 다시 요청할 수 있다.
 - queued는 저장 계약 그대로 충돌이며 일반 500 INTERNAL_ERROR로 반환한다. 새 실행기는 queued를 생성하지 않는다. **queued 중복의 전용 HTTP 코드/재사용 정책은 공통 명세에 없어 협의가 필요하다.** 임의의 새 오류 코드를 공통 명세에 추가하지 않았다.
 - 생성 시 엔진의 20개 장면을 고정하고 익명 입력을 저장한다. 실행기는 `get_execution_inputs` → `start_simulation` → 어댑터 `simulate` → 각 이벤트 `save_event` 순서로 진행한다. 장면은 순차 저장하며 후보별 작업은 병렬로 실행한다. 각 장면에 대화와 판정이 있고 20개 모두 처리된 뒤 정상 스트림 종료일 때만 기존 `score`/`headline`을 호출하고 `complete_simulation`으로 기록한다. report는 null이며 리포트 조립은 하지 않는다.
@@ -533,7 +533,7 @@ ENGINE_IMPL=fake .venv/bin/python -m pytest tests -q
 | 경로 | 내용 |
 | --- | --- |
 | `GET /api/simulations/{id}/scenes` | 완료된 실행의 장면 20개(대화 · 판정). 완료 전 409 |
-| `GET /api/personas/{id}/comparison` | 나와 후보 3명의 5개 축, 점수(완료 시 시뮬레이션 점수, 아니면 1차 점수), 월 예상 갈등, 추천 후보(완료 후보 우선) |
+| `GET /api/personas/{id}/comparison` | 나와 후보 최대 6명의 5개 축, 점수(완료 시 시뮬레이션 점수, 아니면 1차 점수), 월 예상 갈등, 추천 후보(완료 후보 우선) |
 | `POST /api/rules/{rule_id}/proposals` | 규칙 수정 제안 → 엔진 `mediate` 중재안. `rule_proposals` 테이블 저장(신규 테이블, 기존 DB 자동 생성) |
 | `POST /api/proposals/{id}/accept` | 중재안을 규칙 문구로 반영. 반복 호출 결과 동일 |
 | `POST /api/mediation/rephrase` | 불편 메모 → 엔진 `rephrase` 요청형 문장 · 규칙 제안. 메모 원문 미저장 · 미기록 |
@@ -563,3 +563,16 @@ ENGINE_IMPL=fake .venv/bin/python -m pytest tests -q
 - SQLite WAL 모드(`initialize_database`에서 스키마 확인 통과 후 전환, 충돌 시 기존 파일 그대로 보존) · `synchronous=NORMAL`: SSE 읽기가 이벤트 쓰기를 막지 않음
 - uvicorn `--limit-concurrency 300`: 과도한 동시 연결은 503으로 거절
 - 남은 과제(발표 후): 컨테이너 비루트 실행(기존 볼륨 소유권 변경 필요), nginx 요청 수 제한(Envoy 뒤 실제 IP 설정 필요)
+
+## 출시판 갱신: 후보 6명 · 이용권 · 궁합 진단 (11/2)
+
+- 후보 추천 인원을 3명에서 6명으로 확대함(`app/candidates.py`의 `MAX_CANDIDATES` · `ALIASES`, 별칭 후보 A~F). 시뮬레이션 별칭 검증과 리포트 응답 형식도 같은 목록을 따름
+- 개인 요금은 월 구독에서 횟수제 이용권으로 전환함. 룸메이트는 입사 신청 시기에 한 번 결정하므로 월 단위 과금의 근거가 약하다는 판단에 따름
+  - 베이직 무료 3회(`simulation_api.FREE_SIMULATIONS`), 이용권 5회 2,900원 · 15회 6,900원(`app/pass_api.py`)
+  - 사용 횟수 = 실패를 제외한 시뮬레이션 수. 기존 실행 재사용은 차감하지 않음
+  - 한도 확인은 시뮬레이션 생성과 같은 쓰기 트랜잭션에서 수행하며, 초과 시 행을 남기지 않고 `402 PASS_REQUIRED`를 반환함
+  - 신규 테이블 `pass_purchases`는 `app/service_schema.py`에 정의함. 상품 종류는 Pydantic에서 검증하여, 상품 구성 변경 시에도 테이블 구조 충돌(SchemaConflictError)이 발생하지 않도록 함
+  - 기존 `subscription_intents` DDL은 변경하지 않음. 화면에서는 `dorm`(생활관 도입 요청)만 사용함
+- 사용자당 동시 실행 한도를 3건에서 6건으로 조정함(후보 6명 기준). 서버 전체 30건 한도는 유지함
+- 궁합 진단 `GET /api/personas/{id}/diagnosis`(`app/diagnosis.py`)를 추가함. 후보 풀 전체와의 1차 점수로 잘 맞는 후보(75점 이상) 수, 점수를 낮추는 성향 상위 3개, 습관 조정 시 늘어나는 후보 수를 산출함. 후보 개인 정보는 응답에 포함하지 않음
+- 시험: `tests/test_passes_api.py`(구매 · 상한 · 오류 · 횟수 소진 402 · 실패 미차감 · 재사용 미차감 · 별칭 A~F · 진단), 기존 시험의 후보 수 기대값 갱신

@@ -1,4 +1,4 @@
-# 기능: 시드 후보를 검증하고 생활 성향 사전 점수 상위 3명을 추린다.
+# 기능: 시드 후보를 검증하고 생활 성향 사전 점수 상위 6명을 추린다.
 # 시스템 범위: 후보 조회 전용이며 DB 변경·엔진 호출·시뮬레이션은 수행하지 않는다.
 # 결과: 익명 후보 카드 또는 필수 데이터 오류를 반환한다.
 import json
@@ -15,6 +15,9 @@ WEIGHTS = {'sleep_rhythm': 30, 'noise_sensitivity': 25, 'cleanliness': 20,
 HIGHLIGHT_NAMES = {'sleep_rhythm': '수면 리듬', 'noise_sensitivity': '소음 민감도',
                    'cleanliness': '청결 기준', 'sociability': '사교성', 'sharing_tolerance': '공유 성향'}
 Nonempty = Annotated[str, Field(min_length=1, pattern=r'\S')]
+# 추천 후보 수와 별칭(후보 A~F). 시뮬레이션 별칭 검증 · 리포트 응답도 이 목록을 사용한다.
+MAX_CANDIDATES = 6
+ALIASES = tuple(f'후보 {letter}' for letter in 'ABCDEF')
 
 
 class SeedCandidate(BaseModel):
@@ -50,7 +53,7 @@ class CandidateResponse(BaseModel):
 
 
 class CandidatesResponse(BaseModel):
-    candidates: list[CandidateResponse] = Field(max_length=3)
+    candidates: list[CandidateResponse] = Field(max_length=MAX_CANDIDATES)
 
 
 def validate_axes(axes: dict) -> None:
@@ -78,7 +81,7 @@ def highlight_text(axis: str, gap: int) -> str:
 
 
 def select_candidates(me: dict, seed_path: Path) -> CandidatesResponse:
-    """반올림 점수 내림차순, 동점은 ID 오름차순. 부족하면 0~2명 반환.
+    """반올림 점수 내림차순, 동점은 ID 오름차순. 부족하면 0~5명 반환.
 
     시드 손상은 전체 요청 실패로 처리하여 누락 후보를 조용히 제외하지 않는다.
     highlight는 원본 소개 대신 실제 축 차이를 표시하여 개인정보를 전달하지 않는다.
@@ -108,7 +111,7 @@ def select_candidates(me: dict, seed_path: Path) -> CandidatesResponse:
             year=raw['year'], type_name=raw['type_name'], pre_score=score,
             highlight=highlight_text(closest, gap), simulation=None))
     cards.sort(key=lambda card: (-card.pre_score, card.candidate_id))
-    selected = cards[:3]
-    for card, letter in zip(selected, 'ABC'):
-        card.alias = f'후보 {letter}'
+    selected = cards[:MAX_CANDIDATES]
+    for card, alias in zip(selected, ALIASES):
+        card.alias = alias
     return CandidatesResponse(candidates=selected)

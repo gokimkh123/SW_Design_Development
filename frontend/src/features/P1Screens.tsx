@@ -20,15 +20,15 @@ function points(axes: Comparison['me']['axes'], scale = 1): string {
   }).join(' ');
 }
 
-// 후보 아바타 색(.flow-avatar 기본 · --1 · --2)과 같은 계열: 후보 A 보라 · B 주황 · C 파랑
-const radarColors = ['#7954b9', '#e58b2f', '#3f93bd'];
+// 후보 아바타 색(.flow-avatar 기본 · --1 ~ --5)과 같은 계열: A 보라 · B 주황 · C 파랑 · D 초록 · E 분홍 · F 회색
+const radarColors = ['#7954b9', '#e58b2f', '#3f93bd', '#3f9a55', '#cc4f8a', '#5b6b7a'];
 
 function Radar({ me, candidates, selectedId }: { me: Comparison['me']['axes']; candidates: Comparison['candidates']; selectedId: string }) {
   const empty = Object.fromEntries(axisKeys.map(key => [key, 100])) as Comparison['me']['axes'];
   const axisDescription = (axes: Comparison['me']['axes']) => axisKeys.map((key, index) => `${axisLabels[index]} ${axes[key]}`).join(', ');
   return <div className="extra-radar-wrap">
     <svg className="extra-radar" viewBox="0 0 320 270" role="img" aria-labelledby="comparison-radar-title comparison-radar-desc">
-      <title id="comparison-radar-title">나와 후보 3명의 생활 성향 5축 비교</title>
+      <title id="comparison-radar-title">나와 후보들의 생활 성향 5축 비교</title>
       <desc id="comparison-radar-desc">나: {axisDescription(me)}. {candidates.map(candidate => `${candidate.alias}${candidate.candidate_id === selectedId ? '(선택됨)' : ''}: ${axisDescription(candidate.axes)}.`).join(' ')}</desc>
       {[.25, .5, .75, 1].map(level => <polygon key={level} points={points(empty, level)} fill="none" stroke="#e2e9ea" strokeWidth="1" />)}
       {axisKeys.map((_, index) => {
@@ -38,7 +38,7 @@ function Radar({ me, candidates, selectedId }: { me: Comparison['me']['axes']; c
         return <line key={index} x1="160" y1="132" x2={x} y2={y} stroke="#e2e9ea" />;
       })}
       <polygon points={points(me)} fill="#10a092" fillOpacity=".1" stroke="#087f75" strokeWidth="2.5" />
-      {candidates.map((candidate, index) => <polygon key={candidate.candidate_id} points={points(candidate.axes)} fill={radarColors[index % radarColors.length]} fillOpacity=".08" stroke={radarColors[index % radarColors.length]} strokeWidth={candidate.candidate_id === selectedId ? 3 : 2} strokeLinejoin="round" />)}
+      {candidates.map((candidate, index) => <polygon key={candidate.candidate_id} points={points(candidate.axes)} fill={radarColors[index % radarColors.length]} fillOpacity={candidate.candidate_id === selectedId ? .12 : .03} stroke={radarColors[index % radarColors.length]} strokeOpacity={!selectedId || candidate.candidate_id === selectedId ? 1 : .45} strokeWidth={candidate.candidate_id === selectedId ? 3 : 1.5} strokeLinejoin="round" />)}
       {axisLabels.map((label, index) => {
         const angle = -Math.PI / 2 + index * (Math.PI * 2 / 5);
         return <text key={label} x={160 + Math.cos(angle) * 122} y={132 + Math.sin(angle) * 112} textAnchor="middle" dominantBaseline="middle" className="extra-radar-label">{label}</text>;
@@ -83,7 +83,7 @@ export function ComparisonScreen({ personaId, onViewCandidate, onCandidateSelect
     {comparison?.candidates.length === 0 && <ErrorMessage message="비교할 후보가 없어요. 후보 목록을 다시 확인해 주세요." />}
     
     {comparison && selected && <>
-      <section className="flow-card extra-radar-card"><h2>나와 후보 3명의 생활 성향</h2><Radar me={comparison.me.axes} candidates={comparison.candidates} selectedId={candidateId} /></section>
+      <section className="flow-card extra-radar-card"><h2>나와 후보들의 생활 성향</h2><Radar me={comparison.me.axes} candidates={comparison.candidates} selectedId={candidateId} /></section>
       <section className="flow-card extra-rank-card"><h2>후보별 궁합</h2>
         {comparison.candidates.map((candidate, index) => <button type="button" className={`extra-rank-row ${candidateId === candidate.candidate_id ? 'is-selected' : ''}`} key={candidate.candidate_id} disabled={actionBusy} onClick={() => { setCandidateId(candidate.candidate_id); onCandidateSelected(); }} aria-pressed={candidateId === candidate.candidate_id}>
           <span className={`flow-avatar flow-avatar--${index}`}>{candidate.alias.slice(-1)}</span>
