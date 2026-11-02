@@ -1,39 +1,39 @@
 /* 궁합 진단 — 잘 맞는 후보가 적은 이유와 습관 조정 제안 */
 .diag-screen { display: flex; flex-direction: column; gap: 14px; }
 .diag-summary { display: grid; gap: 6px; }
-.diag-summary small { color: #0b8578; font-size: 12.5px; font-weight: 800; }
+.diag-summary small { color: #0b8578; font-size: 14.5px; font-weight: 800; }
 .diag-summary.is-limited small { color: #d9820f; }
 .diag-summary.is-hard small { color: #de5361; }
-.diag-summary h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
-.diag-summary p { margin: 0; color: #5f6b77; font-size: 14px; line-height: 1.6; }
+.diag-summary h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+.diag-summary p { margin: 0; color: #5f6b77; font-size: 16px; line-height: 1.6; }
 .diag-stat { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
-.diag-stat strong { color: #13202a; font-size: 34px; font-weight: 850; letter-spacing: -.03em; }
-.diag-stat strong span { font-size: 16px; }
-.diag-stat > span { color: #6b7680; font-size: 13px; }
+.diag-stat strong { color: #13202a; font-size: 37px; font-weight: 850; letter-spacing: -.03em; }
+.diag-stat strong span { font-size: 18px; }
+.diag-stat > span { color: #6b7680; font-size: 15px; }
 .diag-adjust { background: #e9f8f5; box-shadow: none; }
-.diag-adjust h2 { margin: 0 0 6px; color: #0b7569; font-size: 15px; font-weight: 800; }
-.diag-adjust p { margin: 0; color: #24414a; font-size: 14px; line-height: 1.65; }
+.diag-adjust h2 { margin: 0 0 6px; color: #0b7569; font-size: 17px; font-weight: 800; }
+.diag-adjust p { margin: 0; color: #24414a; font-size: 16px; line-height: 1.65; }
 .diag-factor { display: grid; gap: 12px; }
 .diag-factor-head { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px; }
-.diag-rank { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #fff1d8; color: #d9820f; font-size: 14px; font-weight: 850; }
-.diag-factor-head h3 { margin: 0; font-size: 15.5px; font-weight: 800; }
-.diag-factor-head p { margin: 2px 0 0; color: #5f6b77; font-size: 13px; }
-.diag-loss { color: #de5361; font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+.diag-rank { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #fff1d8; color: #d9820f; font-size: 16px; font-weight: 850; }
+.diag-factor-head h3 { margin: 0; font-size: 17.5px; font-weight: 800; }
+.diag-factor-head p { margin: 2px 0 0; color: #5f6b77; font-size: 15px; }
+.diag-loss { color: #de5361; font-size: 15.5px; font-weight: 800; white-space: nowrap; }
 .diag-bar { position: relative; height: 8px; margin: 6px 7px; border-radius: 99px; background: linear-gradient(90deg, #eef1f4, #e2e6e9); }
 .diag-bar i { position: absolute; top: 50%; width: 14px; height: 14px; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgb(21 47 60 / 25%); }
 .diag-bar-me { background: #109f91; }
 .diag-bar-pool { background: #9aa6b2; }
-.diag-bar-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #6b7680; font-size: 12px; }
+.diag-bar-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #6b7680; font-size: 14px; }
 .diag-bar-legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; vertical-align: 0; }
 .diag-bar-legend i.is-me { background: #109f91; }
 .diag-bar-legend i.is-pool { background: #9aa6b2; }
-.diag-tips { display: grid; gap: 6px; margin: 0; padding: 12px 14px 12px 30px; border-radius: 12px; background: #f5f7f8; color: #33424e; font-size: 13.5px; line-height: 1.55; }
+.diag-tips { display: grid; gap: 6px; margin: 0; padding: 12px 14px 12px 30px; border-radius: 12px; background: #f5f7f8; color: #33424e; font-size: 15.5px; line-height: 1.55; }
 .diag-entry { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border: 0; text-align: left; width: 100%; }
-.diag-entry strong { display: block; font-size: 15px; font-weight: 800; color: #13202a; }
-.diag-entry small { display: block; margin-top: 3px; color: #5f6b77; font-size: 13px; line-height: 1.5; }
+.diag-entry strong { display: block; font-size: 17px; font-weight: 800; color: #13202a; }
+.diag-entry small { display: block; margin-top: 3px; color: #5f6b77; font-size: 15px; line-height: 1.5; }
 .diag-entry.is-warn { background: #fff7ea; box-shadow: 0 0 0 1px #f6d8a8; }
-.diag-entry > span:last-child { color: #0b8578; font-size: 13.5px; font-weight: 800; white-space: nowrap; }
-.pass-chip { align-self: flex-start; justify-self: start; width: fit-content; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; padding: 7px 12px; background: #e3f4f1; color: #0b7569; font-size: 13px; font-weight: 800; }
+.diag-entry > span:last-child { color: #0b8578; font-size: 15.5px; font-weight: 800; white-space: nowrap; }
+.pass-chip { align-self: flex-start; justify-self: start; width: fit-content; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; padding: 7px 12px; background: #e3f4f1; color: #0b7569; font-size: 15px; font-weight: 800; }
 .pass-chip.is-empty { background: #ffe9eb; color: #c8414f; }
 @media (min-width: 1024px) {
   .app-shell.step-diagnosis .flow-screen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 16px 22px; }
