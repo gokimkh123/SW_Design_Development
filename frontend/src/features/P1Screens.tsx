@@ -75,7 +75,7 @@ export function ComparisonScreen({ personaId, onViewCandidate, onCandidateSelect
   const selected = comparison?.candidates.find(item => item.candidate_id === candidateId) ?? comparison?.candidates[0];
   return <div className="flow-screen extra-screen">
     <p className="flow-lead">누구와 함께 살까요?</p>
-    <p className="extra-muted">세 후보의 생활 성향과 궁합 점수를 한눈에 살펴보세요.</p>
+    <p className="extra-muted">추천 후보들의 생활 성향과 궁합 점수를 한눈에 살펴보세요.</p>
     {isMock && <p className="extra-preview">시안 미리보기 · 점수와 월 예상 갈등은 임시 데이터예요.</p>}
     {error && <ErrorMessage message={error} />}
     {actionError && <ErrorMessage message={actionError} />}
