@@ -1,12 +1,15 @@
 # 기능: 기숙사 커뮤니티 API(API.md 4.19) — 자유게시판 · 애로사항 제안 글 · 익명 댓글 · 공감 · 신고.
 # 시스템 범위: 등록 사용자만 작성하며 화면에는 작성자를 익명(글쓴이 · 익명N)으로만 표시한다. 사용자 ID · 닉네임은 응답에 포함하지 않는다.
 # 결과: 욕설 · 연락처 · 링크가 포함된 글은 거절하고, 작성 간격 · 하루 작성 수를 제한하며, 신고 3회 누적 시 자동으로 숨긴다.
+# 애로사항 글에는 사진(글당 3장, 장당 600KB, JPEG · PNG · WebP 시그니처 확인)을 첨부할 수 있다.
+import base64
+import binascii
 import re
 import secrets
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
@@ -20,6 +23,8 @@ Category = Literal['시설', '소음', '청결', '식당', '안전', '기타']
 REPORT_HIDE = 3          # 신고 누적 시 자동 숨김 기준
 FORWARD_LIKES = 5        # 애로사항 글 공감이 이 수 이상이면 '생활관 전달 대상'
 LIST_LIMIT = 50
+MAX_IMAGES = 3            # 애로사항 글당 사진 수
+MAX_IMAGE_BYTES = 600_000  # 사진 1장 최대 크기(브라우저에서 축소 후 업로드, nginx 요청 1MB 제한 이내)
 # 작성 제한: (최소 간격(초), 하루 최대 건수)
 POST_LIMIT = (10, 30)
 COMMENT_LIMIT = (3, 100)
@@ -81,6 +86,11 @@ class CommentCreate(BaseModel):
         return _clean(value)
 
 
+class ImageCreate(BaseModel):
+    model_config = ConfigDict(strict=True, extra='forbid')
+    data: Annotated[str, Field(min_length=16, max_length=MAX_IMAGE_BYTES * 4 // 3 + 64)]
+
+
 class PostSummary(BaseModel):
     post_id: str
     board: Board
@@ -89,6 +99,7 @@ class PostSummary(BaseModel):
     excerpt: str
     like_count: int
     comment_count: int
+    image_count: int
     created_at: str
     is_mine: bool
     forwarded: bool
@@ -104,6 +115,7 @@ class Comment(BaseModel):
 
 class PostDetail(PostSummary):
     body: str
+    images: list[str]
     liked: bool
     reported: bool
     comments: list[Comment]
@@ -134,9 +146,11 @@ def _summary(db, row, user_id):
     likes = _count(db, 'post', row['post_id'], 'like')
     comments = db.execute("SELECT COUNT(*) FROM community_comments WHERE post_id=? AND status='visible'",
                           (row['post_id'],)).fetchone()[0]
+    images = db.execute('SELECT COUNT(*) FROM community_images WHERE post_id=?', (row['post_id'],)).fetchone()[0]
     body = row['body'].replace('\n', ' ')
     return {'post_id': row['post_id'], 'board': row['board'], 'category': row['category'], 'title': row['title'],
             'excerpt': body[:80] + ('…' if len(body) > 80 else ''), 'like_count': likes, 'comment_count': comments,
+            'image_count': images,
             'created_at': row['created_at'], 'is_mine': row['user_id'] == user_id,
             'forwarded': row['board'] == 'grievance' and likes >= FORWARD_LIKES}
 
@@ -151,7 +165,10 @@ def _visible_post(db, post_id):
 def _detail(db, row, user_id):
     comments = db.execute("SELECT * FROM community_comments WHERE post_id=? AND status='visible' "
                           'ORDER BY created_at, rowid', (row['post_id'],)).fetchall()
+    images = db.execute('SELECT image_id FROM community_images WHERE post_id=? ORDER BY created_at, rowid',
+                        (row['post_id'],)).fetchall()
     return {**_summary(db, row, user_id), 'body': row['body'],
+            'images': [f"/api/community/images/{image['image_id']}" for image in images],
             'liked': _has(db, 'post', row['post_id'], user_id, 'like'),
             'reported': _has(db, 'post', row['post_id'], user_id, 'report'),
             'comments': [{'comment_id': c['comment_id'], 'author': '글쓴이' if c['anon_no'] == 0 else f"익명{c['anon_no']}",
@@ -221,6 +238,48 @@ def add_comment(db_path, user_id, post_id, payload: CommentCreate):
         return _detail(db, post, user_id)
 
 
+def _decode_image(data: str) -> tuple[str, bytes]:
+    """data URL 또는 base64 문자열을 바이트로 바꾸고, 선언된 형식이 아니라 파일 시그니처로 형식을 판정한다."""
+    payload = data.split(',', 1)[1] if data.startswith('data:') else data
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError):
+        raise PersonaAPIError(422, 'IMAGE_REJECTED', '사진 파일을 읽을 수 없어요.')
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise PersonaAPIError(422, 'IMAGE_REJECTED', '사진이 너무 커요. 더 작은 사진을 올려 주세요.')
+    if raw[:3] == b'\xff\xd8\xff':
+        return 'image/jpeg', raw
+    if raw[:8] == b'\x89PNG\r\n\x1a\n':
+        return 'image/png', raw
+    if raw[:4] == b'RIFF' and raw[8:12] == b'WEBP':
+        return 'image/webp', raw
+    raise PersonaAPIError(422, 'IMAGE_REJECTED', 'JPEG · PNG · WebP 사진만 올릴 수 있어요.')
+
+
+def add_image(db_path, user_id, post_id, payload: ImageCreate):
+    mime, raw = _decode_image(payload.data)
+    with store._connection(db_path, write=True) as db:
+        post = _visible_post(db, post_id)
+        if post['user_id'] != user_id:
+            raise PersonaAPIError(403, 'NOT_OWNER', '내가 쓴 글에만 사진을 올릴 수 있어요.')
+        if post['board'] != 'grievance':
+            raise PersonaAPIError(422, 'IMAGE_REJECTED', '사진은 애로사항 제안 글에만 첨부할 수 있어요.')
+        if db.execute('SELECT COUNT(*) FROM community_images WHERE post_id=?', (post_id,)).fetchone()[0] >= MAX_IMAGES:
+            raise PersonaAPIError(422, 'IMAGE_REJECTED', f'사진은 글마다 최대 {MAX_IMAGES}장까지 올릴 수 있어요.')
+        db.execute('INSERT INTO community_images VALUES (?,?,?,?,?,?)',
+                   ('img_' + secrets.token_hex(12), post_id, user_id, mime, raw, _now()))
+        return _detail(db, post, user_id)
+
+
+def get_image(db_path, image_id):
+    with store._connection(db_path) as db:
+        row = db.execute("SELECT i.mime, i.data FROM community_images i JOIN community_posts p ON p.post_id=i.post_id "
+                         "WHERE i.image_id=? AND p.status='visible'", (image_id,)).fetchone()
+    if row is None:
+        raise PersonaAPIError(404, 'IMAGE_NOT_FOUND', '사진을 찾을 수 없어요.')
+    return row['mime'], bytes(row['data'])
+
+
 def _visible_comment(db, comment_id):
     row = db.execute("SELECT c.* FROM community_comments c JOIN community_posts p ON p.post_id=c.post_id "
                      "WHERE c.comment_id=? AND c.status='visible' AND p.status='visible'", (comment_id,)).fetchone()
@@ -287,6 +346,18 @@ def create_community_router(database, error_model):
                  responses={**errors, 429: {'model': error_model}})
     async def comment(post_id: str, payload: CommentCreate, x_user_id: Annotated[str | None, Header()] = None):
         return await run(add_comment, x_user_id, post_id, payload)
+
+    @router.post('/posts/{post_id}/images', status_code=201, response_model=PostDetail,
+                 responses={**errors, 403: {'model': error_model}})
+    async def upload_image(post_id: str, payload: ImageCreate, x_user_id: Annotated[str | None, Header()] = None):
+        return await run(add_image, x_user_id, post_id, payload)
+
+    @router.get('/images/{image_id}', response_class=Response, responses={404: {'model': error_model}})
+    async def image(image_id: str):
+        # <img>는 헤더를 보낼 수 없으므로 추측 불가능한 ID(96비트)로만 조회. 숨김 · 삭제된 글의 사진은 404
+        mime, raw = await run_in_threadpool(get_image, database, image_id)
+        return Response(content=raw, media_type=mime,
+                        headers={'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff'})
 
     @router.delete('/comments/{comment_id}', response_model=PostDetail, responses={**errors, 403: {'model': error_model}})
     async def remove_comment(comment_id: str, x_user_id: Annotated[str | None, Header()] = None):

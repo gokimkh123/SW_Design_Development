@@ -134,3 +134,43 @@ def test_validation_auth_and_rate_limit(env, monkeypatch):
     limited = write(call, me)
     assert limited.status_code == 429 and limited.json()['error']['code'] == 'TOO_MANY_POSTS'
     assert call('GET', '/api/community/posts/pst_none', me).status_code == 404
+
+
+PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+
+def test_grievance_photo_upload_and_serve(env):
+    _, (me, a, b, c, _), call = env
+    pid = write(call, me, board='grievance', category='시설').json()['post_id']
+    uploaded = call('POST', f'/api/community/posts/{pid}/images', me, {'data': PNG})
+    assert uploaded.status_code == 201
+    detail = uploaded.json()
+    assert detail['image_count'] == 1 and len(detail['images']) == 1
+    url = detail['images'][0]
+    served = call('GET', url, None)  # <img>는 헤더 없이 요청
+    assert served.status_code == 200 and served.headers['content-type'] == 'image/png'
+    assert served.content.startswith(b'\x89PNG')
+    assert call('GET', '/api/community/posts', a, params={'board': 'grievance'}).json()['posts'][0]['image_count'] == 1
+    # 타인 업로드 · 4장째 · 형식 위장 · 자유게시판 거절
+    assert call('POST', f'/api/community/posts/{pid}/images', a, {'data': PNG}).status_code == 403
+    for _ in range(2):
+        assert call('POST', f'/api/community/posts/{pid}/images', me, {'data': PNG}).status_code == 201
+    fourth = call('POST', f'/api/community/posts/{pid}/images', me, {'data': PNG})
+    assert fourth.status_code == 422 and fourth.json()['error']['code'] == 'IMAGE_REJECTED'
+    fake = 'data:image/png;base64,' + __import__('base64').b64encode(b'<svg onload=alert(1)></svg>' * 2).decode()
+    assert call('POST', f'/api/community/posts/{pid}/images', me, {'data': fake}).json()['error']['code'] in ('IMAGE_REJECTED',)
+    free = write(call, b).json()['post_id']
+    assert call('POST', f'/api/community/posts/{free}/images', b, {'data': PNG}).json()['error']['code'] == 'IMAGE_REJECTED'
+    # 신고로 숨겨진 글의 사진은 더 이상 제공하지 않음
+    for user in (a, b, c):
+        call('POST', f'/api/community/posts/{pid}/report', user)
+    assert call('GET', url, None).status_code == 404
+
+
+def test_photo_size_and_encoding_limits(env, monkeypatch):
+    _, (me, *_), call = env
+    pid = write(call, me, board='grievance').json()['post_id']
+    assert call('POST', f'/api/community/posts/{pid}/images', me, {'data': 'data:image/png;base64,@@@@not-base64@@@@'}).status_code == 422
+    monkeypatch.setattr(community_api, 'MAX_IMAGE_BYTES', 10)
+    too_big = call('POST', f'/api/community/posts/{pid}/images', me, {'data': PNG})
+    assert too_big.status_code == 422 and '너무 커요' in too_big.json()['error']['message']
