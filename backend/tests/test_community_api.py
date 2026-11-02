@@ -103,7 +103,7 @@ def test_delete_only_own(env):
 
 
 @pytest.mark.parametrize('text,needle', [
-    ('진짜 씨 발 너무하네', '욕설'), ('연락 주세요 010-1234-5678', '연락처'), ('여기 보세요 https://example.com', '링크'),
+    ('진짜 씨.발 너무하네', '욕설'), ('병신 같은 소리', '욕설'), ('연락 주세요 010-1234-5678', '연락처'), ('여기 보세요 https://example.com', '링크'),
     ('ㅅ ㅂ 시끄럽다', '욕설')])
 def test_content_filter(env, text, needle):
     db, (me, *_), call = env
@@ -114,9 +114,11 @@ def test_content_filter(env, text, needle):
         assert conn.execute('SELECT COUNT(*) FROM community_posts').fetchone()[0] == 0
 
 
-def test_allowed_words_pass(env):
+@pytest.mark.parametrize('text', ['새 학기 시발점은 기숙사 대청소부터', '책 두 개 새로 샀어요', '감염병 신고는 어디에 하나요',
+                                  '아니 미안, 내가 늦었어', '장애 비율 통계'])
+def test_ordinary_sentences_pass(env, text):
     _, (me, *_), call = env
-    assert write(call, me, body='새 학기 시발점은 기숙사 대청소부터').status_code == 201
+    assert write(call, me, body=text).status_code == 201
 
 
 def test_validation_auth_and_rate_limit(env, monkeypatch):
@@ -127,7 +129,7 @@ def test_validation_auth_and_rate_limit(env, monkeypatch):
                    {'board': 'grievance', 'category': '연애'}):
         response = write(call, me, **fields)
         assert response.status_code == 422 and response.json()['error']['code'] in ('VALIDATION_ERROR',)
-    monkeypatch.setattr(community_api, 'POST_LIMIT', (30, 10))
+    monkeypatch.setattr(community_api, 'POST_LIMIT', (10, 30))
     assert write(call, me).status_code == 201
     limited = write(call, me)
     assert limited.status_code == 429 and limited.json()['error']['code'] == 'TOO_MANY_POSTS'

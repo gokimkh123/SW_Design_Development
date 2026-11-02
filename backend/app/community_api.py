@@ -21,17 +21,20 @@ REPORT_HIDE = 3          # 신고 누적 시 자동 숨김 기준
 FORWARD_LIKES = 5        # 애로사항 글 공감이 이 수 이상이면 '생활관 전달 대상'
 LIST_LIMIT = 50
 # 작성 제한: (최소 간격(초), 하루 최대 건수)
-POST_LIMIT = (30, 10)
-COMMENT_LIMIT = (5, 60)
+POST_LIMIT = (10, 30)
+COMMENT_LIMIT = (3, 100)
 
-# 금칙어(띄어쓰기 · 기호를 제거한 뒤 검사). 모욕 · 비하 표현 위주로 최소한만 둔다.
+# 금칙어: 낱말은 기호만 제거하고 띄어쓰기는 유지한 채 검사("감염병 신고" 같은 정상 문장 오판 방지),
+# 자음 약어(ㅅㅂ 등)만 띄어쓰기까지 제거한 뒤 검사한다. 모욕 · 비하 표현 위주로 최소한만 둔다.
 BANNED = ('씨발', '시발', 'ㅆㅂ', 'ㅅㅂ', '병신', 'ㅂㅅ', 'ㅄ', '개새끼', '개새', '좆', '지랄', '미친놈', '미친년',
           '썅', '니미', '느금', '애미', '애비', '창녀', '걸레년', '한남충', '김치녀', '틀딱', '장애인새끼')
 # 금칙어를 포함하지만 정상적인 낱말(예: 시발점)은 검사 전에 제외한다.
 ALLOWED = ('시발점', '시발역', '애비뉴', '니미츠')
 PHONE = re.compile(r'01[016789][\s\-.]?\d{3,4}[\s\-.]?\d{4}')
 LINK = re.compile(r'https?://|www\.|\.(com|net|kr|io|me|ly)(/|\b)', re.IGNORECASE)
-STRIP = re.compile(r'[\s\W_]+', re.UNICODE)
+SYMBOLS = re.compile(r'[^\w\s]|_', re.UNICODE)
+JAMO = ('ㅆㅂ', 'ㅅㅂ', 'ㅂㅅ', 'ㅄ')
+WORDS = tuple(word for word in BANNED if word not in JAMO)
 
 
 def check_content(*texts: str) -> None:
@@ -40,10 +43,11 @@ def check_content(*texts: str) -> None:
             raise PersonaAPIError(422, 'CONTENT_REJECTED', '전화번호 등 연락처는 게시할 수 없어요.')
         if LINK.search(text):
             raise PersonaAPIError(422, 'CONTENT_REJECTED', '링크는 게시할 수 없어요.')
-        compact = STRIP.sub('', text).lower()
+        spaced = SYMBOLS.sub('', text).lower()
         for word in ALLOWED:
-            compact = compact.replace(word, '')
-        if any(word in compact for word in BANNED):
+            spaced = spaced.replace(word, '')
+        compact = re.sub(r'\s+', '', spaced)
+        if any(word in spaced for word in WORDS) or any(word in compact for word in JAMO):
             raise PersonaAPIError(422, 'CONTENT_REJECTED', '욕설 · 비하 표현이 포함되어 있어요. 표현을 바꿔 다시 작성해 주세요.')
 
 
