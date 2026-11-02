@@ -188,6 +188,7 @@ export const realApi: ApiClient = {
   getPost: (postId: string) => request<CommunityPost>(`/community/posts/${encodeURIComponent(postId)}`),
   deletePost: (postId: string) => request<{ deleted: boolean }>(`/community/posts/${encodeURIComponent(postId)}`, 'DELETE'),
   addComment: (postId: string, body: string) => request<CommunityPost>(`/community/posts/${encodeURIComponent(postId)}/comments`, 'POST', { body }),
+  uploadPostImage: (postId: string, dataUrl: string) => request<CommunityPost>(`/community/posts/${encodeURIComponent(postId)}/images`, 'POST', { data: dataUrl }),
   deleteComment: (commentId: string) => request<CommunityPost>(`/community/comments/${encodeURIComponent(commentId)}`, 'DELETE'),
   likePost: (postId: string) => request<ReactionResult>(`/community/posts/${encodeURIComponent(postId)}/like`, 'POST'),
   reportPost: (postId: string) => request<ReactionResult>(`/community/posts/${encodeURIComponent(postId)}/report`, 'POST'),

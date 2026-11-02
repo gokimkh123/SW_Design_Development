@@ -221,6 +221,7 @@ export interface CommunityPostSummary {
   excerpt: string;
   like_count: number;
   comment_count: number;
+  image_count: number;
   created_at: string;
   is_mine: boolean;
   forwarded: boolean;
@@ -228,7 +229,10 @@ export interface CommunityPostSummary {
 
 export interface CommunityComment { comment_id: string; author: string; body: string; created_at: string; is_mine: boolean }
 
-export interface CommunityPost extends CommunityPostSummary { body: string; liked: boolean; reported: boolean; comments: CommunityComment[] }
+export interface CommunityPost extends CommunityPostSummary { body: string; images: string[]; liked: boolean; reported: boolean; comments: CommunityComment[] }
+
+/** 커뮤니티 화면 상태: 목록 · 글쓰기 · 글 상세 (상단 뒤로 가기 버튼과 공유) */
+export type CommunityView = { kind: 'list' } | { kind: 'write' } | { kind: 'post'; postId: string };
 
 export interface ReactionResult { like_count: number; liked: boolean; reported: boolean; hidden: boolean }
 
@@ -273,6 +277,7 @@ export interface ApiClient {
   getPost(postId: string): Promise<CommunityPost>;
   deletePost(postId: string): Promise<{ deleted: boolean }>;
   addComment(postId: string, body: string): Promise<CommunityPost>;
+  uploadPostImage(postId: string, dataUrl: string): Promise<CommunityPost>;
   deleteComment(commentId: string): Promise<CommunityPost>;
   likePost(postId: string): Promise<ReactionResult>;
   reportPost(postId: string): Promise<ReactionResult>;
