@@ -93,24 +93,24 @@ const candidateAxes: Record<string, Axes> = {
 /** Provisional visual values only; the monthly-conflicts formula is not approved. */
 const previewMonthlyConflicts: Record<string, number> = { per_daeun: 0.5, per_jiho: 1, per_subin: 4, per_soyun: 2, per_minseo: 1.5, per_seoyeon: 2.5 };
 
-type MockPost = Omit<CommunityPost, 'is_mine' | 'liked' | 'reported' | 'like_count' | 'excerpt' | 'comment_count' | 'forwarded' | 'comments'> & {
+type MockPost = Omit<CommunityPost, 'is_mine' | 'liked' | 'reported' | 'like_count' | 'excerpt' | 'comment_count' | 'image_count' | 'forwarded' | 'comments'> & {
   author: string; likes: Set<string>; reports: Set<string>; comments: { comment_id: string; author: string; anon: number; body: string; created_at: string }[];
 };
 /** 로컬 mock 전용 예시 글(실서버에는 시드 글 없음) */
 const mockPosts: MockPost[] = [
-  { post_id: 'pst_mock2', board: 'grievance', category: '시설', title: '3층 세탁실 건조기 고장', body: '3층 건조기 2번이 일주일째 작동하지 않아요. 수리 요청 부탁드립니다.', created_at: '2026-11-02T20:10:00+09:00', author: 'usr_other1', likes: new Set(['a', 'b', 'c', 'd', 'e']), reports: new Set(), comments: [] },
-  { post_id: 'pst_mock1', board: 'free', category: null, title: '기숙사 근처 늦게까지 여는 카페 있나요?', body: '시험 기간이라 밤 늦게까지 공부할 곳을 찾고 있어요.', created_at: '2026-11-02T19:40:00+09:00', author: 'usr_other2', likes: new Set(['a']), reports: new Set(), comments: [{ comment_id: 'cmt_mock1', author: 'usr_other1', anon: 1, body: '정문 앞 카페가 새벽 2시까지 해요', created_at: '2026-11-02T19:52:00+09:00' }] },
+  { post_id: 'pst_mock2', board: 'grievance', category: '시설', title: '3층 세탁실 건조기 고장', body: '3층 건조기 2번이 일주일째 작동하지 않아요. 수리 요청 부탁드립니다.', created_at: '2026-11-02T20:10:00+09:00', images: [], author: 'usr_other1', likes: new Set(['a', 'b', 'c', 'd', 'e']), reports: new Set(), comments: [] },
+  { post_id: 'pst_mock1', board: 'free', category: null, title: '기숙사 근처 늦게까지 여는 카페 있나요?', body: '시험 기간이라 밤 늦게까지 공부할 곳을 찾고 있어요.', created_at: '2026-11-02T19:40:00+09:00', images: [], author: 'usr_other2', likes: new Set(['a']), reports: new Set(), comments: [{ comment_id: 'cmt_mock1', author: 'usr_other1', anon: 1, body: '정문 앞 카페가 새벽 2시까지 해요', created_at: '2026-11-02T19:52:00+09:00' }] },
 ];
 
 function postSummary(post: MockPost, me: string): CommunityPostSummary {
   const flat = post.body.replace(/\n/g, ' ');
   return { post_id: post.post_id, board: post.board, category: post.category, title: post.title,
-    excerpt: flat.length > 80 ? `${flat.slice(0, 80)}…` : flat, like_count: post.likes.size, comment_count: post.comments.length,
+    excerpt: flat.length > 80 ? `${flat.slice(0, 80)}…` : flat, like_count: post.likes.size, comment_count: post.comments.length, image_count: post.images.length,
     created_at: post.created_at, is_mine: post.author === me, forwarded: post.board === 'grievance' && post.likes.size >= 5 };
 }
 
 function postDetail(post: MockPost, me: string): CommunityPost {
-  return { ...postSummary(post, me), body: post.body, liked: post.likes.has(me), reported: post.reports.has(me),
+  return { ...postSummary(post, me), body: post.body, images: [...post.images], liked: post.likes.has(me), reported: post.reports.has(me),
     comments: post.comments.map((item) => ({ comment_id: item.comment_id, author: item.anon === 0 ? '글쓴이' : `익명${item.anon}`, body: item.body, created_at: item.created_at, is_mine: item.author === me })) };
 }
 
@@ -522,7 +522,7 @@ export const mockApi: ApiClient = {
     const me = requireUser();
     if (input.title.trim().length < 2 || input.body.trim().length < 2) throw new ApiError(422, 'VALIDATION_ERROR', '요청 JSON의 필드·자료형과 문구 길이를 확인해 주세요.');
     const post: MockPost = { post_id: `pst_${uid()}`, board: input.board, category: input.board === 'grievance' ? (input.category ?? '기타') : null,
-      title: input.title.trim(), body: input.body.trim(), created_at: now(), author: me, likes: new Set(), reports: new Set(), comments: [] };
+      title: input.title.trim(), body: input.body.trim(), created_at: now(), images: [], author: me, likes: new Set(), reports: new Set(), comments: [] };
     mockPosts.unshift(post);
     return postDetail(post, me);
   },
@@ -540,6 +540,14 @@ export const mockApi: ApiClient = {
     const mine = post.comments.find((item) => item.author === me);
     const anon = post.author === me ? 0 : mine ? mine.anon : Math.max(0, ...post.comments.map((item) => item.anon)) + 1;
     post.comments.push({ comment_id: `cmt_${uid()}`, author: me, anon, body: body.trim(), created_at: now() });
+    return postDetail(post, me);
+  },
+  async uploadPostImage(postId, dataUrl) {
+    const me = requireUser();
+    const post = findPost(postId);
+    if (post.author !== me) throw new ApiError(403, 'NOT_OWNER', '내가 쓴 글에만 사진을 올릴 수 있어요.');
+    if (post.board !== 'grievance' || post.images.length >= 3) throw new ApiError(422, 'IMAGE_REJECTED', '사진은 애로사항 제안 글에 최대 3장까지 올릴 수 있어요.');
+    post.images.push(dataUrl);
     return postDetail(post, me);
   },
   async deleteComment(commentId) {

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api, getUserId, setUserId } from './api';
-import type { Answers, Candidate, Diagnosis, Match, PassSummary, Persona, Report, RuleSet, Scene, Simulation, SurveyQuestion, Utterance, Verdict } from './api/types';
+import type { Answers, Candidate, CommunityView, Diagnosis, Match, PassSummary, Persona, Report, RuleSet, Scene, Simulation, SurveyQuestion, Utterance, Verdict } from './api/types';
 import { AppShell } from './components/Shell';
 import { Icon } from './components/Icon';
 import type { AppTab } from './components/Shell';
@@ -206,6 +206,7 @@ function App() {
   const [passes, setPasses] = useState<PassSummary | null>(null);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [passRequired, setPassRequired] = useState(false);
+  const [communityView, setCommunityView] = useState<CommunityView>({ kind: 'list' });
   const candidatesRef = useRef<Candidate[]>([]);
   useEffect(() => { candidatesRef.current = candidates; }, [candidates]);
   const refreshCandidates = useCallback(async (personaId: string) => {
@@ -557,13 +558,14 @@ function App() {
     if (tab === 'match' && saved.personaId) update({ step: 'candidates' });
     if (tab === 'persona' && saved.personaId) update({ step: 'persona' });
     if (tab === 'plans' && saved.personaId) update({ step: 'plans' });
-    if (tab === 'community' && saved.personaId) update({ step: 'community' });
+    if (tab === 'community' && saved.personaId) { setCommunityView({ kind: 'list' }); update({ step: 'community' }); }
     if (tab === 'all' && isMock) update({ step: 'more' });
   }
 
   function back() {
     const previous: Partial<Record<Step, Step>> = { survey: 'start', persona: 'survey', candidates: 'persona', simulation: 'candidates', report: 'candidates', rules: 'match', comparison: 'candidates', sceneReplay: 'report', ruleProposal: 'rules', room: 'rules', memo: isMock ? 'room' : 'rules', checkin: 'room', admin: 'more', more: 'candidates', diagnosis: 'candidates' };
-    if (step === 'survey' && saved.questionIndex > 0) update({ questionIndex: saved.questionIndex - 1 });
+    if (step === 'community' && communityView.kind !== 'list') setCommunityView({ kind: 'list' });
+    else if (step === 'survey' && saved.questionIndex > 0) update({ questionIndex: saved.questionIndex - 1 });
     else if (step === 'room' && !saved.matchId) update({ step: 'more' });
     else if (previous[step]) update({ step: previous[step] });
   }
@@ -581,7 +583,7 @@ function App() {
   const enabledTabs: AppTab[] = activeTab ? [...new Set<AppTab>([activeTab, ...(saved.personaId ? ['match', 'persona', 'community', 'plans'] as AppTab[] : []), ...(isMock ? ['room', 'all'] as AppTab[] : [])])] : [];
 
   const visibleTabs: AppTab[] | undefined = isMock ? undefined : ['match', 'persona', 'community', 'plans'];
-  return <AppShell className={`step-${step}`} title={title[step]} visibleTabs={visibleTabs} showBack={['survey', 'simulation', 'report', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more', 'diagnosis'].includes(step)} onBack={back} activeTab={activeTab} enabledTabs={enabledTabs} onTabChange={changeTab}>
+  return <AppShell className={`step-${step}`} title={step === 'community' && communityView.kind === 'write' ? '글쓰기' : step === 'community' && communityView.kind === 'post' ? '게시글' : title[step]} visibleTabs={visibleTabs} showBack={['survey', 'simulation', 'report', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more', 'diagnosis'].includes(step) || (step === 'community' && communityView.kind !== 'list')} onBack={back} activeTab={activeTab} enabledTabs={enabledTabs} onTabChange={changeTab}>
     {step === 'start' && <div className="flow-screen flow-start">
       <div className="flow-start-hero">
       <div className="flow-hero-icon" aria-hidden="true"><Icon name="bed" size={46} strokeWidth={1.8} /></div><p className="flow-kicker">우리 방의 시작</p><h1>나와 잘 맞는 룸메이트,<br /><em>미리 만나볼까요?</em></h1><p className="flow-muted">생활 습관을 알아보고 AI 시뮬레이션으로 함께 지낼 모습을 살펴봐요.</p>
@@ -675,7 +677,7 @@ function App() {
     {step === 'ruleProposal' && (selectedRule ? <RuleProposalScreen rule={selectedRule} isMock={isMock} onAccepted={updatedRule => { setRules(current => current ? { ...current, rules: current.rules.map(item => item.rule_id === updatedRule.rule_id ? updatedRule : item) } : current); update({ step: 'rules' }); }} /> : <div className="flow-screen"><Notice tone="warm">규칙을 불러오는 중이거나 선택한 규칙을 찾을 수 없어요.</Notice>{error && <Notice tone="error">{error}</Notice>}</div>)}
     {step === 'room' && isMock && <RoomScreen memoEnabled={Boolean(saved.matchId)} onMemo={() => update({ step: 'memo' })} onCheckin={() => update({ step: 'checkin' })} onRules={() => update({ step: 'rules' })} />}
     {step === 'plans' && <PlansScreen />}
-    {step === 'community' && <CommunityScreen />}
+    {step === 'community' && <CommunityScreen view={communityView} onViewChange={setCommunityView} />}
     {step === 'diagnosis' && saved.personaId && <DiagnosisScreen personaId={saved.personaId} onCandidates={() => update({ step: 'candidates' })} onEditPersona={() => update({ step: 'persona' })} />}
     {step === 'memo' && saved.matchId && <MemoScreen matchId={saved.matchId} isMock={isMock} onKeepPrivate={() => update({ step: isMock ? 'room' : 'rules' })} />}
     {step === 'checkin' && isMock && <CheckinScreen />}

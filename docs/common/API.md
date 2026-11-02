@@ -622,6 +622,8 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 | POST | `/api/community/posts` | 글 작성 `{ "board": "grievance", "category": "소음", "title": "…", "body": "…" }` → `201` PostDetail |
 | GET | `/api/community/posts/{post_id}` | 글 상세 + 댓글 → PostDetail |
 | DELETE | `/api/community/posts/{post_id}` | 본인 글 삭제 → `{ "deleted": true }` |
+| POST | `/api/community/posts/{post_id}/images` | 애로사항 사진 첨부 `{ "data": "data:image/jpeg;base64,…" }`(본인 글, 1장씩) → `201` PostDetail |
+| GET | `/api/community/images/{image_id}` | 사진 원본(인증 헤더 없음, `<img>` 표시용) |
 | POST | `/api/community/posts/{post_id}/comments` | 댓글 작성 `{ "body": "…" }` → `201` PostDetail |
 | DELETE | `/api/community/comments/{comment_id}` | 본인 댓글 삭제 → PostDetail |
 | POST | `/api/community/posts/{post_id}/like` | 공감(1인 1회, 취소 없음) → ReactionResult |
@@ -632,7 +634,8 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 {
   "post_id": "pst_1a2b3c4d5e6f7a8b", "board": "grievance", "category": "소음",
   "title": "밤 12시 이후 복도 통화 소음", "excerpt": "자정 이후 복도에서…", "body": "자정 이후 복도에서…",
-  "like_count": 5, "comment_count": 1, "created_at": "2026-11-02T22:40:00+09:00",
+  "like_count": 5, "comment_count": 1, "image_count": 1, "created_at": "2026-11-02T22:40:00+09:00",
+  "images": ["/api/community/images/img_3f9c…"],
   "is_mine": false, "forwarded": true, "liked": true, "reported": false,
   "comments": [ { "comment_id": "cmt_…", "author": "익명1", "body": "동의합니다", "created_at": "…", "is_mine": false } ]
 }
@@ -647,6 +650,7 @@ SSE 스트림. [5장](#5-실시간-이벤트-sse) 참고.
 - 작성 제한: 글 10초 간격 · 하루 30건, 댓글 3초 간격 · 하루 100건 초과 시 `429 TOO_MANY_POSTS`
 - 신고 3회 누적 시 글 · 댓글을 자동 숨김(`hidden: true`, 이후 조회 `404 POST_NOT_FOUND` · 목록 제외). 운영 중 부적절한 글은 재배포 없이 신고로 숨길 수 있음
 - 본인 글 공감 · 신고 `409 OWN_CONTENT`, 타인 글 · 댓글 삭제 `403 NOT_OWNER`
+- 사진: 애로사항 글에만 글당 최대 3장, 장당 600KB. 형식은 선언값이 아닌 파일 시그니처로 판정(JPEG · PNG · WebP 외 `422 IMAGE_REJECTED`). 화면은 업로드 전에 긴 변 1,280px JPEG로 다시 그려 위치 정보(EXIF)를 제거함. 사진 주소는 추측 불가능한 ID(96비트)이며, 숨김 · 삭제된 글의 사진은 `404 IMAGE_NOT_FOUND`
 
 ---
 
@@ -724,6 +728,7 @@ const reader = res.body!.getReader();
 | 409 | `OWN_CONTENT` | 본인 글 공감 · 신고 |
 | 404 | `POST_NOT_FOUND` · `COMMENT_NOT_FOUND` | 삭제 · 신고 숨김 처리된 글 · 댓글 |
 | 422 | `CONTENT_REJECTED` | 욕설 · 비하 표현, 연락처, 링크 포함 |
+| 422 | `IMAGE_REJECTED` | 사진 형식 · 크기 · 장수 · 게시판 조건 위반 |
 | 429 | `TOO_MANY_POSTS` | 커뮤니티 작성 간격 · 하루 작성 수 초과 |
 | 422 | `VALIDATION_ERROR` | 형식 오류 (FastAPI 기본 422 응답을 본 형식으로 변환) |
 | 429 | `LLM_RATE_LIMITED` | LLM 분당 한도 초과, 잠시 후 재시도 |
