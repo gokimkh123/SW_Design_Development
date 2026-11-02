@@ -31,7 +31,9 @@ export interface SurveyQuestion {
 
 export interface Survey { version: string; questions: SurveyQuestion[] }
 export interface Health { status: 'ok' }
-export interface User { user_id: string; nickname: string; created_at: string }
+/** 동성 룸메이트 매칭용 성별 */
+export type Gender = 'male' | 'female';
+export interface User { user_id: string; nickname: string; gender?: Gender; created_at: string }
 export type Axes = Record<'sleep_rhythm' | 'noise_sensitivity' | 'cleanliness' | 'sociability' | 'sharing_tolerance', number>;
 
 export interface Persona {
@@ -248,7 +250,7 @@ export type SimulationEvent =
 
 export interface ApiClient {
   getHealth(): Promise<Health>;
-  createUser(nickname: string): Promise<User>;
+  createUser(nickname: string, gender: Gender): Promise<User>;
   getSurvey(): Promise<Survey>;
   createPersona(answers: Answers): Promise<Persona>;
   getPersona(id: string): Promise<Persona>;

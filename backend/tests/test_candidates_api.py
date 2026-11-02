@@ -217,7 +217,7 @@ def test_real_seed_with_api_created_persona(tmp_path, monkeypatch):
     seed_path = tmp_path / 'personas.json'
     seed_path.write_bytes((BACKEND_DIR.parent / 'data/seed/personas.json').read_bytes())
     with TestClient(create_app(db_path=tmp_path / 'api.sqlite3', seed_path=seed_path)) as client:
-        user = client.post('/api/users', json={'nickname': '하늘'}).json()
+        user = client.post('/api/users', json={'nickname': '하늘', 'gender': 'female'}).json()
         headers = {'X-User-Id': user['user_id']}
         created = client.post('/api/personas', headers=headers, json={'answers': HANEUL_ANSWERS})
         assert created.status_code == 201

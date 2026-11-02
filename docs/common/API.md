@@ -311,13 +311,14 @@ sequenceDiagram
 
 ```jsonc
 // 요청
-{ "nickname": "하늘" }
+{ "nickname": "하늘", "gender": "female" }
 
 // 201
-{ "user_id": "usr_k3j9x2ab", "nickname": "하늘", "created_at": "2026-11-03T10:11:30+09:00" }
+{ "user_id": "usr_k3j9x2ab", "nickname": "하늘", "gender": "female", "created_at": "2026-11-03T10:11:30+09:00" }
 ```
 
 - `nickname`: 1~10자, 중복 허용
+- `gender`: `male` · `female`(동성 룸메이트 매칭용, 화면에서는 필수 선택). 별도 테이블 `user_profiles`에 저장. 생략 가능하며, 생략한 사용자(11/3 이전 가입자 포함)는 성별 필터 없이 기존 방식으로 추천하고 응답에서 `gender`를 생략함
 - 오류: `422 VALIDATION_ERROR`
 
 ### 4.3 GET /api/survey
@@ -419,7 +420,7 @@ sequenceDiagram
 
 ### 4.7 GET /api/personas/{persona_id}/candidates
 
-- 시드 후보 풀(10명, 본인 제외) 중 1차 점수 상위 6명 반환
+- 시드 후보 풀(여 10명 · 남 10명, 본인 제외) 중 **사용자와 같은 성별**의 후보에서 1차 점수 상위 6명 반환. 후보 비교 · 궁합 진단 · 시뮬레이션 시작도 같은 성별 후보만 허용(다른 성별 후보로 시작 시 `404 PERSONA_NOT_FOUND`)
 
 ```jsonc
 // 200

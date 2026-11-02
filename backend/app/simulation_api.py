@@ -18,7 +18,7 @@ from app.candidates import select_candidates
 from app.engine_adapter import EngineAdapter, get_engine
 from app.persona_api import PersonaAPIError
 from app.personas import get_persona
-from app.users import get_user
+from app.users import get_gender, get_user
 from app import simulations as store
 from app.simulation_stream import stream_events
 from app.simulation_report import Report, get_report
@@ -104,6 +104,7 @@ def create_simulation_router(database, seeds, runner, replay_path, error_model):
         me = get_persona(database, payload.persona_id, user_id=x_user_id)
         if me is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
+        me = {**me, 'gender': get_gender(database, x_user_id)}
         cards = select_candidates(me, seeds).candidates
         card = next((c for c in cards if c.candidate_id == payload.candidate_id), None)
         if card is None:

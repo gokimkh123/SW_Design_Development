@@ -16,7 +16,7 @@ from app.engine_adapter import EngineAdapter, EngineError, get_engine
 from app.persona_api import PersonaAPIError
 from app.personas import get_persona
 from app.simulation_report import expected_conflicts
-from app.users import get_user
+from app.users import get_gender, get_user
 
 ENGINE_TIMEOUT_SECONDS = 10
 AREAS = ('quiet_hours', 'guests', 'cleaning', 'fridge', 'climate', 'supplies')
@@ -106,7 +106,7 @@ def create_p1_router(database, seeds, error_model):
         persona = get_persona(database, persona_id, user_id=x_user_id)
         if persona is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
-        cards = select_candidates(persona, seeds).candidates
+        cards = select_candidates({**persona, 'gender': get_gender(database, x_user_id)}, seeds).candidates
         axes = {p['persona_id']: p['axes'] for p in json.loads(seeds.read_text(encoding='utf-8'))['personas']}
         latest = sim_store.latest_by_candidate(database, persona_id, user_id=x_user_id)
         rows = []
@@ -130,7 +130,7 @@ def create_p1_router(database, seeds, error_model):
         persona = get_persona(database, persona_id, user_id=x_user_id)
         if persona is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
-        return diagnose(persona, seeds)
+        return diagnose({**persona, 'gender': get_gender(database, x_user_id)}, seeds)
 
     @router.post('/api/rules/{rule_id}/proposals', status_code=201,
                  responses={**errors, 503: {'model': error_model}})

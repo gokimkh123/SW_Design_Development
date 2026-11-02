@@ -90,10 +90,10 @@ def create_app(*, db_path: Path | None = None, survey_path: Path | None = None,
                 'llm': {'provider': os.getenv('LLM_PROVIDER', 'anthropic'), 'model': os.getenv('LLM_MODEL', 'claude-haiku-5-5')},
                 'sim_mode': os.getenv('SIM_MODE', 'agents'), 'engine': os.getenv('ENGINE_IMPL', 'fake')}
 
-    @application.post('/api/users', status_code=201, response_model=UserResponse,
+    @application.post('/api/users', status_code=201, response_model=UserResponse, response_model_exclude_none=True,
                       responses={422: {'model': ErrorResponse}, 500: {'model': ErrorResponse}})
     def users(payload: UserCreate):
-        return create_user(database, payload.nickname)
+        return create_user(database, payload.nickname, payload.gender)
 
     @application.get('/api/survey', response_model=Survey, response_model_exclude_none=True,
                      responses={500: {'model': ErrorResponse}})
