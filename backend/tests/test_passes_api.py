@@ -144,7 +144,7 @@ def test_six_candidates_and_diagnosis(tmp_path):
 
 def test_diagnosis_explains_hard_profile():
     from app.diagnosis import diagnose
-    extreme = {'persona_id': 'per_x', 'user_id': 'usr_x',
+    extreme = {'persona_id': 'per_x', 'user_id': 'usr_x', 'gender': 'female',
                'axes': {'sleep_rhythm': 0, 'noise_sensitivity': 100, 'cleanliness': 100,
                         'sociability': 0, 'sharing_tolerance': 0}}
     result = diagnose(extreme, SEED_PATH)

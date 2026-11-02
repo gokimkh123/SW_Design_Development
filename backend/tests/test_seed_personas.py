@@ -15,7 +15,7 @@ PERSONA_KEYS = {
     "conflict_style", "preferences", "must_keep", "okay_with", "is_seed",
 }
 # 시드 전용 필드: 매칭 후 공개 정보(name · greeting), 후보 카드(department · year), 후보 풀 포함 여부, 원본 응답
-SEED_ONLY_KEYS = {"name", "department", "year", "greeting", "candidate_pool", "answers"}
+SEED_ONLY_KEYS = {"name", "department", "year", "greeting", "candidate_pool", "answers", "gender"}
 
 WEIGHTS = {"sleep_rhythm": 0.3, "noise_sensitivity": 0.25, "cleanliness": 0.2, "sociability": 0.15, "sharing_tolerance": 0.1}
 
@@ -34,11 +34,14 @@ def pre_score(me, other):
     return fake_engine.round_half_up(100 - gap)
 
 
-def test_eleven_personas_with_ten_candidates():
-    assert len(PERSONAS) == 11
-    assert len(BY_ID) == 11
+def test_personas_with_ten_candidates_per_gender():
+    assert len(PERSONAS) == 21
+    assert len(BY_ID) == 21
     pool = [p for p in PERSONAS if p["candidate_pool"]]
-    assert len(pool) == 10
+    assert len(pool) == 20
+    # 동성 매칭: 성별마다 후보 10명
+    assert sum(p["gender"] == "female" for p in pool) == 10 and sum(p["gender"] == "male" for p in pool) == 10
+    assert {p["gender"] for p in PERSONAS} == {"female", "male"}
     assert [p["persona_id"] for p in PERSONAS if not p["candidate_pool"]] == ["per_haneul"]
 
 
@@ -84,7 +87,7 @@ def test_haneul_top3_are_subin_daeun_jiho():
     """PRD 4장: 하늘 기준 상위 3명이 수빈 · 다은 · 지호가 되도록 설계."""
     haneul = BY_ID["per_haneul"]
     ranked = sorted(
-        (p for p in PERSONAS if p["candidate_pool"]),
+        (p for p in PERSONAS if p["candidate_pool"] and p["gender"] == haneul["gender"]),
         key=lambda p: (-pre_score(haneul, p), p["persona_id"]),
     )
     assert {p["persona_id"] for p in ranked[:3]} == {"per_subin", "per_daeun", "per_jiho"}

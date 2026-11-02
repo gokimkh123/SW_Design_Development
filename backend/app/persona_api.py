@@ -15,7 +15,7 @@ from app.candidates import CandidateSimulation, CandidatesResponse, select_candi
 from app import simulations as sim_store
 from app.personas import PersonaData, create_persona, get_persona, update_preferences
 from app.survey import Survey, load_survey
-from app.users import get_user
+from app.users import get_gender, get_user
 
 # 전체 응답 예산 10초 중 DB 저장 시간을 남기고, 지연된 LLM은 규칙 기반으로 대체한다.
 PERSONA_ENGINE_TIMEOUT_SECONDS = 8.0
@@ -128,7 +128,7 @@ def create_persona_router(database: Path, official: Path, draft: Path, *,
         persona = get_persona(database, persona_id, user_id=user['user_id'])
         if persona is None:
             raise PersonaAPIError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.')
-        result = select_candidates(persona, seed_path)
+        result = select_candidates({**persona, 'gender': get_gender(database, user['user_id'])}, seed_path)
         # 후보별 최근 실행 상태를 함께 반환 (API.md 3 Candidate.simulation)
         latest = sim_store.latest_by_candidate(database, persona_id, user_id=user['user_id'])
         for card in result.candidates:

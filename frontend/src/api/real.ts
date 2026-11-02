@@ -1,5 +1,5 @@
 import type {
-  Answers, ApiClient, Candidate, CommunityBoard, CommunityPost, CommunityPostSummary, Comparison, Diagnosis, PostInput, ReactionResult, Match, PassProduct, PassSummary, Persona, RephraseResult, Report,
+  Answers, ApiClient, Gender, Candidate, CommunityBoard, CommunityPost, CommunityPostSummary, Comparison, Diagnosis, PostInput, ReactionResult, Match, PassProduct, PassSummary, Persona, RephraseResult, Report,
   Health, Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Subscription,
   SubscriptionPlan, Survey, User,
 } from './types';
@@ -153,7 +153,7 @@ function subscribeSimulation(
 
 export const realApi: ApiClient = {
   getHealth: () => request<Health>('/health', 'GET', undefined, true),
-  createUser: (nickname: string) => request<User>('/users', 'POST', { nickname }, true),
+  createUser: (nickname: string, gender: Gender) => request<User>('/users', 'POST', { nickname, gender }, true),
   getSurvey: () => request<Survey>('/survey', 'GET', undefined, true),
   createPersona: (answers: Answers) => request<Persona>('/personas', 'POST', { answers }),
   getPersona: (id: string) => request<Persona>(`/personas/${encodeURIComponent(id)}`),

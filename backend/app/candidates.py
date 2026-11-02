@@ -93,12 +93,16 @@ def select_candidates(me: dict, seed_path: Path) -> CandidatesResponse:
     cards = []
     seen = set()
     nickname = me.get('nickname') or ''
+    # 동성 매칭: 사용자 성별이 있으면 같은 성별 시드만 후보로 둔다(성별 미입력 기존 사용자는 필터 없음)
+    gender = me.get('gender')
     for raw in seeds:
         seed = SeedCandidate.model_validate(raw)
         if seed.persona_id in seen or not seed.is_seed:
             raise ValueError('시드 ID 중복 또는 시드 표시 오류입니다.')
         seen.add(seed.persona_id)
         # 닉네임에 후보 실명이 들어 있으면 익명 치환이 사용자 이름까지 바꾸므로(다은이 → 후보 A이) 후보에서 제외
+        if gender is not None and raw.get('gender') != gender:
+            continue
         if (not seed.candidate_pool or seed.persona_id == me['persona_id']
                 or seed.user_id == me['user_id']
                 or any(name and name in nickname for name in (raw.get('name'), raw.get('nickname')))):
