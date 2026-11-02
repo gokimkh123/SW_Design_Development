@@ -209,6 +209,31 @@ export interface Diagnosis {
   best_adjustment: { axes: (keyof Axes)[]; labels: string[]; good_before: number; good_after: number } | null;
 }
 
+/** 기숙사 커뮤니티 (API.md 4.19). 작성자는 익명(글쓴이 · 익명N)으로만 표시 */
+export type CommunityBoard = 'free' | 'grievance';
+export type GrievanceCategory = '시설' | '소음' | '청결' | '식당' | '안전' | '기타';
+
+export interface CommunityPostSummary {
+  post_id: string;
+  board: CommunityBoard;
+  category: string | null;
+  title: string;
+  excerpt: string;
+  like_count: number;
+  comment_count: number;
+  created_at: string;
+  is_mine: boolean;
+  forwarded: boolean;
+}
+
+export interface CommunityComment { comment_id: string; author: string; body: string; created_at: string; is_mine: boolean }
+
+export interface CommunityPost extends CommunityPostSummary { body: string; liked: boolean; reported: boolean; comments: CommunityComment[] }
+
+export interface ReactionResult { like_count: number; liked: boolean; reported: boolean; hidden: boolean }
+
+export interface PostInput { board: CommunityBoard; category?: GrievanceCategory; title: string; body: string }
+
 export type SimulationEvent =
   | { id: string; type: 'simulation_started'; data: { simulation_id: string; mode: SimulationMode; total_scenes: number; me: { name: string; type_name: string }; candidate: { alias: string; type_name: string } } }
   | { id: string; type: 'scene_started'; data: { scene_index: number; scene: Scene } }
@@ -243,5 +268,14 @@ export interface ApiClient {
   getPasses(): Promise<PassSummary>;
   buyPass(product: PassProduct): Promise<PassSummary>;
   getDiagnosis(personaId: string): Promise<Diagnosis>;
+  listPosts(board: CommunityBoard): Promise<{ posts: CommunityPostSummary[] }>;
+  createPost(input: PostInput): Promise<CommunityPost>;
+  getPost(postId: string): Promise<CommunityPost>;
+  deletePost(postId: string): Promise<{ deleted: boolean }>;
+  addComment(postId: string, body: string): Promise<CommunityPost>;
+  deleteComment(commentId: string): Promise<CommunityPost>;
+  likePost(postId: string): Promise<ReactionResult>;
+  reportPost(postId: string): Promise<ReactionResult>;
+  reportComment(commentId: string): Promise<ReactionResult>;
   subscribeSimulation(id: string, onEvent: (event: SimulationEvent) => void, onError: (error: Error) => void): () => void;
 }

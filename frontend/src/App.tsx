@@ -11,19 +11,20 @@ import { withSessionSimulation } from './lib/candidateOverlay';
 import { ComparisonScreen, MemoScreen, RuleProposalScreen, SceneReplayScreen } from './features/P1Screens';
 import { PlansScreen } from './features/PlansScreen';
 import { DiagnosisScreen } from './features/DiagnosisScreen';
+import { CommunityScreen } from './features/CommunityScreen';
 import { CandidateCard, displayedScore } from './features/CandidateCard';
 import { DayChips, TypingBubble, useChatPlayback } from './features/ChatPlayback';
 import { AdminScreen, AxisPreviewEditor, CheckinScreen, DemoMenuScreen, RoomScreen } from './features/P2Screens';
 import './features/flow.css';
 import './features/extras.css';
 
-type Step = 'start' | 'survey' | 'persona' | 'candidates' | 'simulation' | 'report' | 'match' | 'rules' | 'comparison' | 'sceneReplay' | 'ruleProposal' | 'room' | 'memo' | 'checkin' | 'admin' | 'more' | 'plans' | 'diagnosis';
+type Step = 'start' | 'survey' | 'persona' | 'candidates' | 'simulation' | 'report' | 'match' | 'rules' | 'comparison' | 'sceneReplay' | 'ruleProposal' | 'room' | 'memo' | 'checkin' | 'admin' | 'more' | 'plans' | 'diagnosis' | 'community';
 type SceneView = { index: number; scene?: Scene; turns: Utterance[]; verdict?: Verdict; reason?: string; agreement?: string | null; rule?: string | null; unresolved?: string | null };
 type Saved = { step: Step; nickname: string; personaId?: string; simulationId?: string; candidateId?: string; candidateAlias?: string; matchId?: string; ruleId?: string; questionIndex: number; answers: Answers };
 const STORAGE_KEY = 'roommate:p0-flow';
 const EMPTY: Saved = { step: 'start', nickname: '', questionIndex: 0, answers: {} };
 const isMock = import.meta.env.VITE_USE_MOCK === 'true';
-const allSteps: Step[] = ['start', 'survey', 'persona', 'candidates', 'simulation', 'report', 'match', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more', 'plans', 'diagnosis'];
+const allSteps: Step[] = ['start', 'survey', 'persona', 'candidates', 'simulation', 'report', 'match', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more', 'plans', 'diagnosis', 'community'];
 // P2(우리 방 · 체크인 · 관리자)는 발표회 범위 밖: 실서버 모드에서는 숨김
 const mockOnlySteps: Step[] = ['room', 'checkin', 'admin', 'more'];
 const axisNames: Record<keyof Persona['axes'], string> = { sleep_rhythm: '수면 리듬', noise_sensitivity: '소음 민감', cleanliness: '청결', sociability: '사교성', sharing_tolerance: '공유 관대' };
@@ -556,6 +557,7 @@ function App() {
     if (tab === 'match' && saved.personaId) update({ step: 'candidates' });
     if (tab === 'persona' && saved.personaId) update({ step: 'persona' });
     if (tab === 'plans' && saved.personaId) update({ step: 'plans' });
+    if (tab === 'community' && saved.personaId) update({ step: 'community' });
     if (tab === 'all' && isMock) update({ step: 'more' });
   }
 
@@ -574,11 +576,11 @@ function App() {
   const shownDays = new Set(visibleScenes.map(item => item.scene?.day).filter((day): day is number => day != null));
   const currentDay = visibleScenes[visibleScenes.length - 1]?.scene?.day ?? null;
   const simStatusText = !simulation ? '연결 중' : simulation.status === 'failed' ? '중단됨' : simulation.status === 'completed' && playback.caughtUp ? '완료' : scenes.length === 0 ? '준비 중' : '대화 진행 중';
-  const title: Record<Step, string> = { start: '룸메궁합', survey: question?.section === 'situation' ? '상황 질문' : '생활 설문', persona: '내 생활 페르소나', candidates: '후보 룸메이트', simulation: activeCandidate?.alias ?? saved.candidateAlias ?? '룸메이트 시뮬레이션', report: '궁합 리포트', match: '매칭 성사', rules: '생활 규칙', comparison: '후보 비교', sceneReplay: '대화 다시 보기', ruleProposal: '규칙 수정 제안', room: '우리 방', memo: '불편 전하기', checkin: '월간 체크인', admin: '관리자 시안', more: '전체', plans: '이용권', diagnosis: '궁합 진단' };
-  const activeTab: AppTab | undefined = ['room', 'memo', 'checkin'].includes(step) ? 'room' : ['more', 'admin'].includes(step) ? 'all' : step === 'persona' ? 'persona' : step === 'plans' ? 'plans' : ['candidates', 'simulation', 'report', 'comparison', 'sceneReplay', 'match', 'rules', 'ruleProposal', 'diagnosis'].includes(step) ? 'match' : undefined;
-  const enabledTabs: AppTab[] = activeTab ? [...new Set<AppTab>([activeTab, ...(saved.personaId ? ['match', 'persona', 'plans'] as AppTab[] : []), ...(isMock ? ['room', 'all'] as AppTab[] : [])])] : [];
+  const title: Record<Step, string> = { start: '룸메궁합', survey: question?.section === 'situation' ? '상황 질문' : '생활 설문', persona: '내 생활 페르소나', candidates: '후보 룸메이트', simulation: activeCandidate?.alias ?? saved.candidateAlias ?? '룸메이트 시뮬레이션', report: '궁합 리포트', match: '매칭 성사', rules: '생활 규칙', comparison: '후보 비교', sceneReplay: '대화 다시 보기', ruleProposal: '규칙 수정 제안', room: '우리 방', memo: '불편 전하기', checkin: '월간 체크인', admin: '관리자 시안', more: '전체', plans: '이용권', diagnosis: '궁합 진단', community: '커뮤니티' };
+  const activeTab: AppTab | undefined = ['room', 'memo', 'checkin'].includes(step) ? 'room' : ['more', 'admin'].includes(step) ? 'all' : step === 'persona' ? 'persona' : step === 'plans' ? 'plans' : step === 'community' ? 'community' : ['candidates', 'simulation', 'report', 'comparison', 'sceneReplay', 'match', 'rules', 'ruleProposal', 'diagnosis'].includes(step) ? 'match' : undefined;
+  const enabledTabs: AppTab[] = activeTab ? [...new Set<AppTab>([activeTab, ...(saved.personaId ? ['match', 'persona', 'community', 'plans'] as AppTab[] : []), ...(isMock ? ['room', 'all'] as AppTab[] : [])])] : [];
 
-  const visibleTabs: AppTab[] | undefined = isMock ? undefined : ['match', 'persona', 'plans'];
+  const visibleTabs: AppTab[] | undefined = isMock ? undefined : ['match', 'persona', 'community', 'plans'];
   return <AppShell className={`step-${step}`} title={title[step]} visibleTabs={visibleTabs} showBack={['survey', 'simulation', 'report', 'rules', 'comparison', 'sceneReplay', 'ruleProposal', 'room', 'memo', 'checkin', 'admin', 'more', 'diagnosis'].includes(step)} onBack={back} activeTab={activeTab} enabledTabs={enabledTabs} onTabChange={changeTab}>
     {step === 'start' && <div className="flow-screen flow-start">
       <div className="flow-start-hero">
@@ -673,6 +675,7 @@ function App() {
     {step === 'ruleProposal' && (selectedRule ? <RuleProposalScreen rule={selectedRule} isMock={isMock} onAccepted={updatedRule => { setRules(current => current ? { ...current, rules: current.rules.map(item => item.rule_id === updatedRule.rule_id ? updatedRule : item) } : current); update({ step: 'rules' }); }} /> : <div className="flow-screen"><Notice tone="warm">규칙을 불러오는 중이거나 선택한 규칙을 찾을 수 없어요.</Notice>{error && <Notice tone="error">{error}</Notice>}</div>)}
     {step === 'room' && isMock && <RoomScreen memoEnabled={Boolean(saved.matchId)} onMemo={() => update({ step: 'memo' })} onCheckin={() => update({ step: 'checkin' })} onRules={() => update({ step: 'rules' })} />}
     {step === 'plans' && <PlansScreen />}
+    {step === 'community' && <CommunityScreen />}
     {step === 'diagnosis' && saved.personaId && <DiagnosisScreen personaId={saved.personaId} onCandidates={() => update({ step: 'candidates' })} onEditPersona={() => update({ step: 'persona' })} />}
     {step === 'memo' && saved.matchId && <MemoScreen matchId={saved.matchId} isMock={isMock} onKeepPrivate={() => update({ step: isMock ? 'room' : 'rules' })} />}
     {step === 'checkin' && isMock && <CheckinScreen />}

@@ -499,3 +499,16 @@ test('mock: 무료 가상 동거 횟수 소진 시 402 · 이용권 구매 후 �
   const diagnosis = await mockApi.getDiagnosis(persona.persona_id);
   assert.ok(diagnosis.factors.length > 0 && diagnosis.factors[0].tips.length > 0);
 });
+
+test('mock: 커뮤니티 글 · 익명 댓글 · 본인 글 공감 거절', async () => {
+  setUserId('usr_community_test');
+  const post = await mockApi.createPost({ board: 'grievance', category: '소음', title: '복도 소음 제안', body: '야간 통화 자제 안내를 부탁드려요.' });
+  assert.equal(post.category, '소음');
+  assert.equal(post.is_mine, true);
+  const listed = (await mockApi.listPosts('grievance')).posts;
+  assert.ok(listed.some((item) => item.post_id === post.post_id));
+  const commented = await mockApi.addComment(post.post_id, '좋은 제안이에요');
+  assert.equal(commented.comments[0].author, '글쓴이');
+  await assert.rejects(mockApi.likePost(post.post_id), { status: 409, code: 'OWN_CONTENT' });
+  assert.deepEqual(await mockApi.deletePost(post.post_id), { deleted: true });
+});
