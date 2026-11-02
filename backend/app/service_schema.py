@@ -42,7 +42,7 @@ SCHEMAS = {
         created_at TEXT NOT NULL,
         PRIMARY KEY (target_type, target_id, user_id, kind)
     )''',
-    # 애로사항 첨부 사진(글당 최대 3장). 서버에서 파일 시그니처로 형식(JPEG · PNG · WebP)을 확인한 원본 바이트만 저장
+    # 게시글 첨부 사진(글당 최대 3장, 자유게시판 · 애로사항 공통). 서버에서 파일 시그니처로 형식(JPEG · PNG · WebP)을 확인한 원본 바이트만 저장
     'community_images': '''CREATE TABLE community_images (
         image_id TEXT NOT NULL PRIMARY KEY,
         post_id TEXT NOT NULL REFERENCES community_posts(post_id),
