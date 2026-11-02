@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api, getUserId, setUserId } from './api';
-import type { Answers, Candidate, CommunityView, Diagnosis, Match, PassSummary, Persona, Report, RuleSet, Scene, Simulation, SurveyQuestion, Utterance, Verdict } from './api/types';
+import type { Answers, Candidate, CommunityView, Diagnosis, Gender, Match, PassSummary, Persona, Report, RuleSet, Scene, Simulation, SurveyQuestion, Utterance, Verdict } from './api/types';
 import { AppShell } from './components/Shell';
 import { Icon } from './components/Icon';
 import type { AppTab } from './components/Shell';
@@ -206,6 +206,7 @@ function App() {
   const [passes, setPasses] = useState<PassSummary | null>(null);
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [passRequired, setPassRequired] = useState(false);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [communityView, setCommunityView] = useState<CommunityView>({ kind: 'list' });
   const candidatesRef = useRef<Candidate[]>([]);
   useEffect(() => { candidatesRef.current = candidates; }, [candidates]);
@@ -268,10 +269,10 @@ function App() {
 
   async function start() {
     const nickname = saved.nickname.trim();
-    if (nickname.length < 1 || nickname.length > 10 || busy) return;
+    if (nickname.length < 1 || nickname.length > 10 || !gender || busy) return;
     setBusy(true); setError('');
     try {
-      const user = await api.createUser(nickname);
+      const user = await api.createUser(nickname, gender);
       setUserId(user.user_id);
       const survey = await api.getSurvey();
       setQuestions(survey.questions);
@@ -592,8 +593,11 @@ function App() {
       <div className="flow-start-form">
       <Notice>매칭 전에는 실명과 사진이 공개되지 않아요. 닉네임만으로 바로 시작할 수 있어요.</Notice>
       <label className="flow-input-label" htmlFor="nickname">어떻게 불러드릴까요?</label><input id="nickname" className="flow-input" maxLength={10} placeholder="닉네임을 입력해 주세요" value={saved.nickname} onChange={event => update({ nickname: event.target.value })} onKeyDown={event => { if (event.key === 'Enter') void start(); }} /><small className="flow-count">{saved.nickname.trim().length}/10자</small>
+      <span className="flow-input-label" id="gender-label">성별</span>
+      <div className="flow-gender" role="radiogroup" aria-labelledby="gender-label">{([['female', '여학생'], ['male', '남학생']] as const).map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={gender === value} className={gender === value ? 'is-active' : ''} onClick={() => setGender(value)}>{label}</button>)}</div>
+      <small className="flow-gender-note">같은 성별의 학생끼리만 룸메이트 후보로 추천돼요.</small>
       {error && <Notice tone="error">{error}</Notice>}
-      <Footer><Button disabled={busy || saved.nickname.trim().length < 1} onClick={() => void start()}>{busy ? '시작하는 중…' : '나의 룸메이트 찾기'}</Button></Footer>
+      <Footer><Button disabled={busy || saved.nickname.trim().length < 1 || !gender} onClick={() => void start()}>{busy ? '시작하는 중…' : '나의 룸메이트 찾기'}</Button></Footer>
       </div>
     </div>}
 

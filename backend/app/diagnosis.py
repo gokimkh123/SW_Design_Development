@@ -47,8 +47,10 @@ TIPS = {
 
 def _pool(me: dict, seed_path: Path) -> list[dict]:
     seeds = json.loads(seed_path.read_text(encoding='utf-8'))['personas']
+    gender = me.get('gender')  # 동성 매칭: 진단도 같은 성별 후보 풀 기준
     return [raw for raw in seeds if raw.get('candidate_pool') is True
-            and raw['persona_id'] != me['persona_id'] and raw.get('user_id') != me['user_id']]
+            and raw['persona_id'] != me['persona_id'] and raw.get('user_id') != me['user_id']
+            and (gender is None or raw.get('gender') == gender)]
 
 
 def _good_count(axes: dict, pool: list[dict]) -> int:

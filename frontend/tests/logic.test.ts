@@ -140,14 +140,14 @@ test('실 API: health → 사용자 생성 → 설문 조회를 공개 경로로
   };
   try {
     assert.deepEqual(await realApi.getHealth(), { status: 'ok' });
-    const user = await realApi.createUser('하늘');
+    const user = await realApi.createUser('하늘', 'female');
     setUserId(user.user_id);
     const survey = await realApi.getSurvey();
     assert.equal(survey.questions.length, 12);
     assert.deepEqual(calls.map(({ method, path }) => [method, path]), [
       ['GET', '/api/health'], ['POST', '/api/users'], ['GET', '/api/survey'],
     ]);
-    assert.deepEqual(calls[1].body, { nickname: '하늘' });
+    assert.deepEqual(calls[1].body, { nickname: '하늘', gender: 'female' });
     assert.ok(calls.every(({ userId }) => userId === null));
   } finally {
     setUserId(null);
@@ -313,7 +313,7 @@ test('P2 미리보기: 관리자 데이터에 대화·메모 원문 또는 실�
 });
 
 test('mock: A1→C2 계약 경로, 익명 후보, 20장면, 6개 규칙', async () => {
-  const user = await mockApi.createUser('하늘');
+  const user = await mockApi.createUser('하늘', 'female');
   setUserId(user.user_id);
   const survey = await mockApi.getSurvey();
   const answers: Answers = Object.fromEntries(survey.questions.map((q) =>
@@ -387,7 +387,7 @@ test('P1 mock: 장면 다시 보기→후보 비교→규칙 중재→비공개 
     },
   });
   try {
-    const user = await mockApi.createUser('새봄');
+    const user = await mockApi.createUser('새봄', 'female');
     setUserId(user.user_id);
     const survey = await mockApi.getSurvey();
     const answers: Answers = Object.fromEntries(survey.questions.map((question) => [
@@ -441,7 +441,7 @@ test('P1 mock: 장면 다시 보기→후보 비교→규칙 중재→비공개 
 });
 
 test('P1 mock: 두 매치의 규칙 제안·수락은 다른 매치를 바꾸지 않는다', async () => {
-  const user = await mockApi.createUser('서리');
+  const user = await mockApi.createUser('서리', 'male');
   setUserId(user.user_id);
   const survey = await mockApi.getSurvey();
   const answers: Answers = Object.fromEntries(survey.questions.map((question) => [

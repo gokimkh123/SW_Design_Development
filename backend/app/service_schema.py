@@ -51,4 +51,10 @@ SCHEMAS = {
         data BLOB NOT NULL,
         created_at TEXT NOT NULL
     )''',
+    # 사용자 성별(동성 룸메이트 매칭용). 기존 users 테이블 DDL을 바꾸지 않기 위해 별도 테이블에 둔다. 값: male · female
+    'user_profiles': '''CREATE TABLE user_profiles (
+        user_id TEXT NOT NULL PRIMARY KEY REFERENCES users(user_id),
+        gender TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )''',
 }

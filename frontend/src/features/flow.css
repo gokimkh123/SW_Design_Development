@@ -271,3 +271,8 @@
 }
 /* 시작 화면 묶음: 모바일은 기존 한 열 흐름 그대로(PC는 responsive.css에서 2단) */
 .flow-start-hero, .flow-start-form { display: contents; }
+/* 시작 화면 성별 선택(동성 매칭) */
+.flow-gender { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; border-radius: 12px; padding: 4px; background: #e6eaed; }
+.flow-gender button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: #5f6b77; font-size: 15px; font-weight: 800; }
+.flow-gender button.is-active { background: #fff; color: #0b7569; box-shadow: 0 1px 3px rgb(21 47 60 / 12%); }
+.flow-gender-note { display: block; margin-top: 6px; color: #7c8994; font-size: 12.5px; }
