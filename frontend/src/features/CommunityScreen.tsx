@@ -120,7 +120,7 @@ function WriteView({ board, onDone }: { board: CommunityBoard; onDone: (post: Co
     <label>제목<input value={title} maxLength={40} onChange={event => setTitle(event.target.value)} placeholder={board === 'grievance' ? '예) 3층 세탁실 건조기 고장' : '제목을 입력하세요'} /></label>
     <label>내용<textarea value={body} maxLength={1000} rows={7} onChange={event => setBody(event.target.value)} placeholder={board === 'grievance' ? '어디서 · 언제 · 어떤 불편이 있는지 적어 주세요.' : '내용을 입력하세요'} /></label>
     <small className="community-count">{body.length} / 1000</small>
-    {board === 'grievance' && <div className="community-photos">
+    <div className="community-photos">
       <span className="community-photos-label">사진 첨부 <small>{photos.length} / {MAX_PHOTOS}</small></span>
       <div className="community-photo-row">
         {photos.map((photo, index) => <div className="community-photo-thumb" key={`${photo.name}-${index}`}>
@@ -130,8 +130,8 @@ function WriteView({ board, onDone }: { board: CommunityBoard; onDone: (post: Co
         {photos.length < MAX_PHOTOS && <button type="button" className="community-photo-add" onClick={() => fileInput.current?.click()} disabled={busy}><span aria-hidden="true">＋</span>사진 추가</button>}
       </div>
       <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event => void pick(event.target.files)} />
-      <small className="community-photo-note">고장 · 파손 부위처럼 상황을 보여 주는 사진을 올려 주세요. 얼굴이나 개인 정보가 보이지 않게 해 주세요.</small>
-    </div>}
+      <small className="community-photo-note">{board === 'grievance' ? '고장 · 파손 부위처럼 상황을 보여 주는 사진을 올려 주세요. ' : ''}다른 사람의 얼굴이나 개인 정보가 보이지 않게 해 주세요.</small>
+    </div>
     {error && <p className="extra-error" role="alert">{error}</p>}
     <button className="flow-button" type="button" disabled={!ready || busy} onClick={() => void submit()}>{busy ? '올리는 중…' : '익명으로 올리기'}</button>
   </section>;
