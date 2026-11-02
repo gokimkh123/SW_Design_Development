@@ -1,7 +1,7 @@
 # 기능: 기숙사 커뮤니티 API(API.md 4.19) — 자유게시판 · 애로사항 제안 글 · 익명 댓글 · 공감 · 신고.
 # 시스템 범위: 등록 사용자만 작성하며 화면에는 작성자를 익명(글쓴이 · 익명N)으로만 표시한다. 사용자 ID · 닉네임은 응답에 포함하지 않는다.
 # 결과: 욕설 · 연락처 · 링크가 포함된 글은 거절하고, 작성 간격 · 하루 작성 수를 제한하며, 신고 3회 누적 시 자동으로 숨긴다.
-# 애로사항 글에는 사진(글당 3장, 장당 600KB, JPEG · PNG · WebP 시그니처 확인)을 첨부할 수 있다.
+# 두 게시판 모두 사진(글당 3장, 장당 600KB, JPEG · PNG · WebP 시그니처 확인)을 첨부할 수 있다.
 import base64
 import binascii
 import re
@@ -262,8 +262,6 @@ def add_image(db_path, user_id, post_id, payload: ImageCreate):
         post = _visible_post(db, post_id)
         if post['user_id'] != user_id:
             raise PersonaAPIError(403, 'NOT_OWNER', '내가 쓴 글에만 사진을 올릴 수 있어요.')
-        if post['board'] != 'grievance':
-            raise PersonaAPIError(422, 'IMAGE_REJECTED', '사진은 애로사항 제안 글에만 첨부할 수 있어요.')
         if db.execute('SELECT COUNT(*) FROM community_images WHERE post_id=?', (post_id,)).fetchone()[0] >= MAX_IMAGES:
             raise PersonaAPIError(422, 'IMAGE_REJECTED', f'사진은 글마다 최대 {MAX_IMAGES}장까지 올릴 수 있어요.')
         db.execute('INSERT INTO community_images VALUES (?,?,?,?,?,?)',

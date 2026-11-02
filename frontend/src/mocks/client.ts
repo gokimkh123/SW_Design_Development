@@ -546,7 +546,7 @@ export const mockApi: ApiClient = {
     const me = requireUser();
     const post = findPost(postId);
     if (post.author !== me) throw new ApiError(403, 'NOT_OWNER', '내가 쓴 글에만 사진을 올릴 수 있어요.');
-    if (post.board !== 'grievance' || post.images.length >= 3) throw new ApiError(422, 'IMAGE_REJECTED', '사진은 애로사항 제안 글에 최대 3장까지 올릴 수 있어요.');
+    if (post.images.length >= 3) throw new ApiError(422, 'IMAGE_REJECTED', '사진은 글마다 최대 3장까지 올릴 수 있어요.');
     post.images.push(dataUrl);
     return postDetail(post, me);
   },

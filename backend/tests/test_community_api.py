@@ -151,7 +151,7 @@ def test_grievance_photo_upload_and_serve(env):
     assert served.status_code == 200 and served.headers['content-type'] == 'image/png'
     assert served.content.startswith(b'\x89PNG')
     assert call('GET', '/api/community/posts', a, params={'board': 'grievance'}).json()['posts'][0]['image_count'] == 1
-    # 타인 업로드 · 4장째 · 형식 위장 · 자유게시판 거절
+    # 타인 업로드 · 4장째 · 형식 위장 거절, 자유게시판 허용
     assert call('POST', f'/api/community/posts/{pid}/images', a, {'data': PNG}).status_code == 403
     for _ in range(2):
         assert call('POST', f'/api/community/posts/{pid}/images', me, {'data': PNG}).status_code == 201
@@ -160,7 +160,8 @@ def test_grievance_photo_upload_and_serve(env):
     fake = 'data:image/png;base64,' + __import__('base64').b64encode(b'<svg onload=alert(1)></svg>' * 2).decode()
     assert call('POST', f'/api/community/posts/{pid}/images', me, {'data': fake}).json()['error']['code'] in ('IMAGE_REJECTED',)
     free = write(call, b).json()['post_id']
-    assert call('POST', f'/api/community/posts/{free}/images', b, {'data': PNG}).json()['error']['code'] == 'IMAGE_REJECTED'
+    free_upload = call('POST', f'/api/community/posts/{free}/images', b, {'data': PNG})
+    assert free_upload.status_code == 201 and free_upload.json()['image_count'] == 1
     # 신고로 숨겨진 글의 사진은 더 이상 제공하지 않음
     for user in (a, b, c):
         call('POST', f'/api/community/posts/{pid}/report', user)
