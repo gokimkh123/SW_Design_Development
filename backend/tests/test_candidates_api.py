@@ -59,9 +59,9 @@ def test_ranking_contract_privacy_and_stability(setup):
     response = request(setup)
     assert response.status_code == 200
     cards = response.json()['candidates']
-    assert [c['candidate_id'] for c in cards] == ['per_a', 'per_b', 'per_c']
-    assert [c['pre_score'] for c in cards] == [100, 90, 90]
-    assert [c['alias'] for c in cards] == ['후보 A', '후보 B', '후보 C']
+    assert [c['candidate_id'] for c in cards] == ['per_a', 'per_b', 'per_c', 'per_d']
+    assert [c['pre_score'] for c in cards] == [100, 90, 90, 80]
+    assert [c['alias'] for c in cards] == ['후보 A', '후보 B', '후보 C', '후보 D']
     for card in cards:
         assert set(card) == {'candidate_id', 'alias', 'department', 'year', 'type_name',
                              'pre_score', 'highlight', 'simulation'}
@@ -104,7 +104,14 @@ def test_half_up_differs_from_builtin_round():
     assert pre_score(axes(), dict(zip(WEIGHTS, [33, 67, 84, 33, 0]))) == 52
 
 
-@pytest.mark.parametrize('count', [0, 1, 2])
+def test_top_six_with_aliases_a_to_f(setup):
+    write_seeds(setup, [seed(str(i), i * 5) for i in range(8)])
+    cards = request(setup).json()['candidates']
+    assert [c['candidate_id'] for c in cards] == [f'per_{i}' for i in range(6)]
+    assert [c['alias'] for c in cards] == [f'후보 {letter}' for letter in 'ABCDEF']
+
+
+@pytest.mark.parametrize('count', [0, 1, 2, 5])
 def test_short_pool_and_exclude_self(setup, count):
     me = setup[3]
     same_id = seed('self')
@@ -202,6 +209,9 @@ def test_openapi(setup):
     assert 'nickname' not in fields
 
 
+SIX_FOR_HANEUL = {'per_daeun', 'per_jiho', 'per_subin', 'per_soyun', 'per_minseo', 'per_seoyeon'}
+
+
 def test_real_seed_with_api_created_persona(tmp_path, monkeypatch):
     monkeypatch.setenv('ENGINE_IMPL', 'fake')
     seed_path = tmp_path / 'personas.json'
@@ -214,5 +224,5 @@ def test_real_seed_with_api_created_persona(tmp_path, monkeypatch):
         response = client.get(f"/api/personas/{created.json()['persona_id']}/candidates", headers=headers)
         assert response.status_code == 200
         cards = response.json()['candidates']
-        assert {c['candidate_id'] for c in cards} == {'per_subin', 'per_daeun', 'per_jiho'}
+        assert {c['candidate_id'] for c in cards} == SIX_FOR_HANEUL
         assert [c['pre_score'] for c in cards] == sorted([c['pre_score'] for c in cards], reverse=True)

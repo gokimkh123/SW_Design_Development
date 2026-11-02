@@ -13,7 +13,7 @@ from app import simulations as store
 
 class Candidate(store.EventData):
     candidate_id: str
-    alias: Literal['후보 A', '후보 B', '후보 C']
+    alias: Literal['후보 A', '후보 B', '후보 C', '후보 D', '후보 E', '후보 F']
     type_name: str
 
 

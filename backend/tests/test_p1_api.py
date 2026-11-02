@@ -72,7 +72,7 @@ def test_comparison_uses_simulation_score_when_completed(context):
     db, args, user, persona = context
     before = get(db, f"/api/personas/{persona['persona_id']}/comparison", user['user_id']).json()
     assert set(before) == {'me', 'candidates', 'recommended_candidate_id'}
-    assert len(before['candidates']) == 3 and all(c['expected_conflicts_per_month'] is None for c in before['candidates'])
+    assert len(before['candidates']) == 6 and all(c['expected_conflicts_per_month'] is None for c in before['candidates'])
     assert set(before['candidates'][0]) == {'candidate_id', 'alias', 'axes', 'score', 'expected_conflicts_per_month'}
     completed(context)
     after = get(db, f"/api/personas/{persona['persona_id']}/comparison", user['user_id']).json()

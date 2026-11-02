@@ -5,11 +5,14 @@ import { provisionalSurvey } from './survey';
 import type {
   Answers, ApiClient, Axes, Candidate, Comparison, Match, Persona, RephraseResult,
   Report, Rule, RuleProposal, RuleSet, Scene, SceneResult, Simulation, SimulationEvent,
-  SimulationMode, Subscription, Verdict,
+  SimulationMode, Subscription, Verdict, PassPurchase, PassProduct, Diagnosis,
 } from '../api/types';
 
 const now = () => new Date().toISOString();
 let subscription: Subscription = { plan: null, updated_at: null };
+const FREE_SIMULATIONS = 3;
+const PASS_PRODUCTS: Record<PassProduct, { credits: number; price: number }> = { pass_5: { credits: 5, price: 2900 }, pass_15: { credits: 15, price: 6900 } };
+let passPurchases: PassPurchase[] = [];
 const clone = <T,>(value: T): T => structuredClone(value);
 const uid = () => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
 const requireUser = () => {
@@ -59,8 +62,11 @@ const candidateSeed: Candidate[] = [
   { candidate_id: 'per_daeun', alias: '후보 A', department: '간호학과', year: 1, type_name: '깔끔한 집순이', pre_score: 91, highlight: '청결 기준 비슷', simulation: null },
   { candidate_id: 'per_jiho', alias: '후보 B', department: '컴퓨터공학과', year: 1, type_name: '조용한 독서가', pre_score: 87, highlight: '소음 민감도 비슷', simulation: null },
   { candidate_id: 'per_subin', alias: '후보 C', department: '경영학과', year: 1, type_name: '자유로운 올빼미', pre_score: 77, highlight: '수면 리듬 차이 큼', simulation: null },
+  { candidate_id: 'per_soyun', alias: '후보 D', department: '화학과', year: 1, type_name: '꼼꼼한 계획형', pre_score: 72, highlight: '청결 기준 비슷', simulation: null },
+  { candidate_id: 'per_minseo', alias: '후보 E', department: '디자인학과', year: 2, type_name: '유연한 저녁형', pre_score: 69, highlight: '청결 기준 비교적 비슷', simulation: null },
+  { candidate_id: 'per_seoyeon', alias: '후보 F', department: '국어국문학과', year: 1, type_name: '느긋한 중간형', pre_score: 68, highlight: '사교성 비교적 비슷', simulation: null },
 ];
-const partnerNames: Record<string, string> = { per_daeun: '다은', per_jiho: '지호', per_subin: '수빈' };
+const partnerNames: Record<string, string> = { per_daeun: '다은', per_jiho: '지호', per_subin: '수빈', per_soyun: '소윤', per_minseo: '민서', per_seoyeon: '서연' };
 
 const sceneTitles = [
   '첫날 짐 정리', '아침 알람', '책상 조명', '조용한 시간', '분리수거',
@@ -79,9 +85,29 @@ const candidateAxes: Record<string, Axes> = {
   per_daeun: { sleep_rhythm: 25, noise_sensitivity: 67, cleanliness: 100, sociability: 33, sharing_tolerance: 33 },
   per_jiho: { sleep_rhythm: 50, noise_sensitivity: 67, cleanliness: 67, sociability: 0, sharing_tolerance: 0 },
   per_subin: { sleep_rhythm: 83, noise_sensitivity: 33, cleanliness: 84, sociability: 33, sharing_tolerance: 0 },
+  per_soyun: { sleep_rhythm: 17, noise_sensitivity: 100, cleanliness: 100, sociability: 0, sharing_tolerance: 67 },
+  per_minseo: { sleep_rhythm: 58, noise_sensitivity: 33, cleanliness: 67, sociability: 67, sharing_tolerance: 67 },
+  per_seoyeon: { sleep_rhythm: 50, noise_sensitivity: 33, cleanliness: 33, sociability: 67, sharing_tolerance: 33 },
 };
 /** Provisional visual values only; the monthly-conflicts formula is not approved. */
-const previewMonthlyConflicts: Record<string, number> = { per_daeun: 0.5, per_jiho: 1, per_subin: 4 };
+const previewMonthlyConflicts: Record<string, number> = { per_daeun: 0.5, per_jiho: 1, per_subin: 4, per_soyun: 2, per_minseo: 1.5, per_seoyeon: 2.5 };
+
+function passSummary() {
+  const used = [...simulations.values()].filter((item) => item.status !== 'failed').length;
+  const purchased = passPurchases.reduce((sum, item) => sum + item.credits, 0);
+  return { free_quota: FREE_SIMULATIONS, purchased, used, remaining: Math.max(0, FREE_SIMULATIONS + purchased - used), purchases: clone(passPurchases) };
+}
+
+/** 목업 진단: 예민 · 아침형 사용자가 받는 예시 응답 */
+const mockDiagnosis: Diagnosis = {
+  pool_size: 10, good_score: 75, good_count: 2, level: 'limited', best_score: 81,
+  factors: [
+    { axis: 'noise_sensitivity', label: '소음 민감도', summary: '소리에 예민한 편이에요', my_value: 100, pool_median: 33, far_count: 7, score_loss: 15, tips: ['귀마개 · 백색소음으로 스스로 대비하는 방법을 먼저 마련해 보세요.', '허용할 수 있는 소음 시간대를 구체적으로 정해 두세요.'], good_after_adjust: 3 },
+    { axis: 'sleep_rhythm', label: '수면 리듬', summary: '일찍 자는 편이에요', my_value: 17, pool_median: 54, far_count: 4, score_loss: 10.4, tips: ['안대 · 귀마개를 준비해 상대의 늦은 귀가에 대비해 보세요.', '취침 시간을 미리 알려 소등 시각을 함께 정해 보세요.'], good_after_adjust: 3 },
+    { axis: 'sociability', label: '사교성', summary: '혼자 있는 시간을 중시해요', my_value: 0, pool_median: 50, far_count: 5, score_loss: 8, tips: ['가벼운 인사와 일정 공유 정도는 먼저 건네 보세요.', '혼자 있고 싶은 시간을 미리 말해 두면 오해가 줄어요.'], good_after_adjust: 2 },
+  ],
+  best_adjustment: { axes: ['noise_sensitivity'], labels: ['소음 민감도'], good_before: 2, good_after: 3 },
+};
 
 function findSimulation(id: string): Simulation {
   requireUser();
@@ -328,6 +354,11 @@ export const mockApi: ApiClient = {
     const existing = [...simulations.values()].find((item) =>
       item.persona_id === personaId && item.candidate_id === candidateId && item.mode === mode && item.status !== 'failed');
     if (existing) { ensureRunning(existing); return clone(existing); }
+    const used = [...simulations.values()].filter((item) => item.status !== 'failed').length;
+    const bought = passPurchases.reduce((sum, item) => sum + item.credits, 0);
+    if (used >= FREE_SIMULATIONS + bought) {
+      throw new ApiError(402, 'PASS_REQUIRED', '이용 가능한 가상 동거 횟수를 모두 사용했어요. 이용권을 구매하면 다른 후보와도 이어서 진행할 수 있어요.');
+    }
     const simulation: Simulation = {
       simulation_id: `sim_${uid()}`, persona_id: personaId, candidate_id: candidateId,
       mode, status: 'queued', progress: { done: 0, total: 20 },
@@ -448,6 +479,18 @@ export const mockApi: ApiClient = {
   async getSubscription() { requireUser(); return { ...subscription }; },
   async saveSubscription(plan) { requireUser(); subscription = { plan, updated_at: now() }; return { ...subscription }; },
   async cancelSubscription() { requireUser(); subscription = { plan: null, updated_at: null }; return { ...subscription }; },
+  async getPasses() { requireUser(); return passSummary(); },
+  async buyPass(product) {
+    requireUser();
+    const item = PASS_PRODUCTS[product];
+    passPurchases = [{ purchase_id: `pas_${uid()}`, product, credits: item.credits, price: item.price, created_at: now() }, ...passPurchases];
+    return passSummary();
+  },
+  async getDiagnosis(personaId): Promise<Diagnosis> {
+    requireUser();
+    if (!persona || persona.persona_id !== personaId) throw new ApiError(404, 'PERSONA_NOT_FOUND', '페르소나를 찾을 수 없어요.');
+    return clone(mockDiagnosis);
+  },
   async rephraseMemo(matchId, memo): Promise<RephraseResult> {
     requireUser();
     if (!matches.has(matchId)) throw new ApiError(404, 'MATCH_NOT_FOUND', '매칭을 찾을 수 없어요.');

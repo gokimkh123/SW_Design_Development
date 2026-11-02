@@ -22,7 +22,7 @@ const tabs: { id: AppTab; label: string; icon: IconName }[] = [
   { id: 'room', label: '우리 방', icon: 'room' },
   { id: 'match', label: '매칭', icon: 'match' },
   { id: 'persona', label: '페르소나', icon: 'persona' },
-  { id: 'plans', label: '멤버십', icon: 'plans' },
+  { id: 'plans', label: '이용권', icon: 'plans' },
   { id: 'all', label: '전체', icon: 'all' },
 ];
 

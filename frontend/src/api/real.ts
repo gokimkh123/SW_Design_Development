@@ -1,5 +1,5 @@
 import type {
-  Answers, ApiClient, Candidate, Comparison, Match, Persona, RephraseResult, Report,
+  Answers, ApiClient, Candidate, Comparison, Diagnosis, Match, PassProduct, PassSummary, Persona, RephraseResult, Report,
   Health, Rule, RuleProposal, RuleSet, SceneResult, Simulation, SimulationEvent, SimulationMode, Subscription,
   SubscriptionPlan, Survey, User,
 } from './types';
@@ -180,5 +180,8 @@ export const realApi: ApiClient = {
   getSubscription: () => request<Subscription>('/subscriptions/me'),
   saveSubscription: (plan: SubscriptionPlan) => request<Subscription>('/subscriptions/me', 'PUT', { plan }),
   cancelSubscription: () => request<Subscription>('/subscriptions/me', 'DELETE'),
+  getPasses: () => request<PassSummary>('/passes/me'),
+  buyPass: (product: PassProduct) => request<PassSummary>('/passes', 'POST', { product }),
+  getDiagnosis: (personaId: string) => request<Diagnosis>(`/personas/${encodeURIComponent(personaId)}/diagnosis`),
   subscribeSimulation,
 };

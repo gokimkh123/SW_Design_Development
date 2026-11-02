@@ -25,7 +25,8 @@ from app.simulation_report import Report, get_report
 
 
 MAX_ACTIVE_SIMULATIONS = 30
-MAX_RUNNING_PER_USER = 3  # 후보 3명을 동시에 돌려도 되는 수준, 한 사람이 전체 자리를 차지하지 못하게 함
+MAX_RUNNING_PER_USER = 6  # 후보 6명을 동시에 돌려도 되는 수준, 한 사람이 전체 자리를 차지하지 못하게 함
+FREE_SIMULATIONS = 3  # 베이직(무료) 가상 동거 횟수. 초과분은 이용권(app/pass_api.py)으로 충전
 
 
 class SimulationCreate(BaseModel):
@@ -94,7 +95,7 @@ def create_simulation_router(database, seeds, runner, replay_path, error_model):
 
     @router.post('', status_code=202, response_model=SimulationResponse,
                  responses={200: {'model': SimulationResponse}, **{
-                     status: {'model': error_model} for status in (401, 404, 422, 500)}})
+                     status: {'model': error_model} for status in (401, 402, 404, 422, 429, 500)}})
     async def start(payload: SimulationCreate, response: Response,
                     engine: Annotated[EngineAdapter, Depends(get_engine)],
                     x_user_id: Annotated[str | None, Header()] = None):
@@ -120,8 +121,12 @@ def create_simulation_router(database, seeds, runner, replay_path, error_model):
         try:
             sim, created = store.create_or_reuse_simulation(database, user_id=x_user_id,
                 persona_id=payload.persona_id, candidate=candidate, alias=card.alias, scenes=scenes, mode='live',
-                max_running_per_user=MAX_RUNNING_PER_USER, max_running_total=MAX_ACTIVE_SIMULATIONS)
+                max_running_per_user=MAX_RUNNING_PER_USER, max_running_total=MAX_ACTIVE_SIMULATIONS,
+                free_quota=FREE_SIMULATIONS)
         except store.SimulationLimitError as exc:
+            if exc.scope == 'quota':
+                raise PersonaAPIError(402, 'PASS_REQUIRED', '이용 가능한 가상 동거 횟수를 모두 사용했어요. '
+                                      '이용권을 구매하면 다른 후보와도 이어서 진행할 수 있어요.') from None
             message = ('진행 중인 가상 동거가 너무 많아요. 하나가 끝난 뒤 다시 시작해 주세요.' if exc.scope == 'user'
                        else '지금 이용하는 분이 많아요. 잠시 후 다시 시작해 주세요.')
             raise PersonaAPIError(429, 'LLM_RATE_LIMITED', message) from None
